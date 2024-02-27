@@ -1,0 +1,8 @@
+# ninja log v5
+1	37	1708101824413135458	build.ninja	b599ccb4e1bf47c
+701	758	1707681351349299544	cuda_hello_world	5934262f037e0e2e
+1	651	1707681351241297775	CMakeFiles/cuda_hello_world.dir/helloWorld.cu.o	3baf9ccf4fd664c8
+653	701	1707681351289298562	CMakeFiles/cuda_hello_world.dir/cmake_device_link.o	db733b58612a8847
+2	683	1708101840069405403	CMakeFiles/cuda_hello_world.dir/helloWorld.cu.o	5e39fa9f6e381cca
+684	734	1708101840121406300	CMakeFiles/cuda_hello_world.dir/cmake_device_link.o	873b2a2e5dfc4440
+734	794	1708101840185407403	cuda_hello_world	5934262f037e0e2e

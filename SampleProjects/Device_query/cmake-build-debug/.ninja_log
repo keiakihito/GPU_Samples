@@ -1,0 +1,7 @@
+# ninja log v5
+0	703	1708101505111629625	CMakeFiles/Device_query.dir/device-query.cu.o	c13e912a1eaa1c7e
+705	754	1708101505163630522	CMakeFiles/Device_query.dir/cmake_device_link.o	52dbdaa8ffad118b
+754	819	1708101505227631625	Device_query	521ec183ff3a7f5a
+1	701	1708101974535723801	CMakeFiles/Device_query.dir/device-query.cu.o	75ae2734c32ec330
+701	751	1708101974587724697	CMakeFiles/Device_query.dir/cmake_device_link.o	52dbdaa8ffad118b
+752	810	1708101974647725732	Device_query	521ec183ff3a7f5a

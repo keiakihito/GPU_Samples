@@ -1,0 +1,60 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.18"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "vecAddKernel",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "vecAddKernel::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-vecAddKernel-Debug-3cfe4498557849c0289b.json",
+					"name" : "vecAddKernel",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/home/keiakihito/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/SampleProjects/vecAddKernel/cmake-build-debug",
+		"source" : "/home/keiakihito/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/SampleProjects/vecAddKernel"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}

@@ -1,0 +1,7 @@
+# ninja log v5
+1	671	1708101111768845119	CMakeFiles/vecAddKernel.dir/main.cu.o	e3fa43b4e3c481a7
+673	722	1708101111820846016	CMakeFiles/vecAddKernel.dir/cmake_device_link.o	c5a37d8f071a5363
+723	791	1708101111888847188	vecAddKernel	dc43cb048906240
+2	737	1708102048168993309	CMakeFiles/vecAddKernel.dir/main.cu.o	223c4daa4c2c30e3
+737	788	1708102048220994206	CMakeFiles/vecAddKernel.dir/cmake_device_link.o	c5a37d8f071a5363
+788	864	1708102048296995516	vecAddKernel	dc43cb048906240

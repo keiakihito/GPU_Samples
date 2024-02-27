@@ -1,0 +1,4 @@
+/home/keiakihito/.local/share/JetBrains/Toolbox/apps/clion-nova/bin/cmake/linux/x64/bin/cmake -DCMAKE_BUILD_TYPE=Debug -DCMAKE_MAKE_PROGRAM=/home/keiakihito/.local/share/JetBrains/Toolbox/apps/clion-nova/bin/ninja/linux/x64/ninja -G Ninja -S /home/keiakihito/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/SampleProjects/Device_query -B /home/keiakihito/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/SampleProjects/Device_query/cmake-build-debug
+-- Configuring done (0.0s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/keiakihito/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/SampleProjects/Device_query/cmake-build-debug
