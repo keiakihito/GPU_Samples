@@ -11,6 +11,7 @@
 	}\
 }
 
+
 //CPU:  compute vector sum z_d = x_d+y_d using a grid of threads on CPU
 void vecAdd(float* x, float* y, float* z, int n){
 	for(unsigned int i = 0; i < n; i++){
