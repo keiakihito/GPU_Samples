@@ -10,6 +10,8 @@ __global__ void vecAddKernel(float *x_d, float *y_d, float *z_d, unsigned int n)
 }
 
 int main (int argc, char** argv){
+	CHECK(cudaDeviceSynchronize());
+
 	unsigned int n = 1024;
 
 	//Allocate host memory for arrays x_h, y_h, and z_h; and initialize arrays x_h and y_h.
