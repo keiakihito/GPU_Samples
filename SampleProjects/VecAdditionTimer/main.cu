@@ -35,6 +35,9 @@ double myCPUTimer(){
 
 
 int main (int argc, char** argv){
+	//Warm Up before excuting Kernel
+	CHECK(cudaDeviceSynchronize());
+
 	//Total problem size
 	unsigned int n = 16777216;
 	// For excution time mesurment
@@ -63,6 +66,7 @@ int main (int argc, char** argv){
 	CHECK(cudaMalloc((void**)&x_d, sizeof(float)*n));
 	CHECK(cudaMalloc((void**)&y_d, sizeof(float)*n));
 	CHECK(cudaMalloc((void**)&z_d, sizeof(float)*n));
+	CHECK(cudaDeviceSynchronize());
 	// GPU memory allocation mesurement 
 	endTime = myCPUTimer();
 	printf("cudaMalloc: ");
@@ -73,6 +77,7 @@ int main (int argc, char** argv){
 	startTime = myCPUTimer();
 	CHECK(cudaMemcpy(x_d, x_h, sizeof(float)*n, cudaMemcpyHostToDevice));
 	CHECK(cudaMemcpy(y_d, y_h, sizeof(float)*n, cudaMemcpyHostToDevice));
+	CHECK(cudaDeviceSynchronize());
 	//Time mesurement for copy from Host to Device 
 	endTime = myCPUTimer();
 	totalGpuTime += (endTime - startTime);
@@ -86,18 +91,20 @@ int main (int argc, char** argv){
 	CHECK(cudaDeviceSynchronize());
 	endTime = myCPUTimer();
 	totalGpuTime += (endTime - startTime);
-	printf("vecAddKernel<<<(32768, 1, 1), (512, 1, 1)>>>: %f s\n", endTime - startTime);
+	printf("vecAddKernel<<<(%d, %d, %d), (%d, %d, %d)>>>: %f s\n", gridDim.x, gridDim.y, gridDim.z, blockDim.x, blockDim.y, blockDim.z, endTime - startTime);
+	fflush(stdout);
 
 	//(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
 	startTime = myCPUTimer();
 	CHECK(cudaMemcpy(z_h, z_d, sizeof(float)*n, cudaMemcpyDeviceToHost));
+	CHECK(cudaDeviceSynchronize());
 	endTime = myCPUTimer();
 	//Time mesurement for copy from Device to Host
 	totalGpuTime += (endTime - startTime);
 	printf("cudaMemcpy (Device to Host): %f s\n", endTime - startTime);
 
 	//Print Total GPU Time
-	printf("VecAdd on Total GPU time %fs\n", totalGpuTime);
+	printf("VecAdd on Total GPU time %f s\n", totalGpuTime);
 
 
 	//(5) Free device memory of arrays x_d, y_d, and z_d
@@ -112,6 +119,4 @@ int main (int argc, char** argv){
 	y_h = NULL;
 	free(z_h);
 	z_h = NULL;
-
-
 }
