@@ -1,0 +1,4 @@
+# ninja log v5
+5796	5840	1709061663482920335	CMakeFiles/main.dir/cmake_device_link.o	be66c5dd1334c55d
+1	5794	1709061663434917083	CMakeFiles/main.dir/main.cu.o	dca48a2c8f9d673e
+1	42	1709062266237715872	build.ninja	9812b2b988c55016

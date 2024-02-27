@@ -1,4 +1,7 @@
 # ninja log v5
-1	669	1709046538314250628	CMakeFiles/main.dir/main.cu.o	7749dbccac148a78
 670	716	1709046538358252847	CMakeFiles/main.dir/cmake_device_link.o	be66c5dd1334c55d
+1	669	1709046538314250628	CMakeFiles/main.dir/main.cu.o	7749dbccac148a78
 716	770	1709046538414255669	main	cb44ad1add7a85b5
+1	631	1709060464519423509	CMakeFiles/main.dir/main.cu.o	7749dbccac148a78
+631	674	1709060464563424696	CMakeFiles/main.dir/cmake_device_link.o	be66c5dd1334c55d
+675	720	1709060464611425991	main	cb44ad1add7a85b5

@@ -130,7 +130,7 @@ int main(int argc, char** argv){
 	//Implement a gpu version that calls a CUDA kernel
 	cv::Mat grayImg_gpu(nRows, nCols, CV_8UC1, cv::Scalar(1));
 	startTime = myCPUTimer();
-	colortoGray_d(grayImg_gpu, colorImg, nRows, nChannels);
+	colortoGray_d(grayImg_gpu, colorImg, nRows,nCols, nChannels);
 	endTime = myCPUTimer();
 	printf("color-to-gray on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
