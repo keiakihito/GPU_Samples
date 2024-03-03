@@ -1,0 +1,60 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-f5ebdc15457944623624.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.28"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "HostFunctinos",
+					"targetIndexes" : 
+					[
+						0
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "HostFunctinos::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-HostFunctinos-Debug-78d2fa86be08a5126f23.json",
+					"name" : "HostFunctinos",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "/Users/keita-katsumi/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/Homework/GPU_Samples/HW1/HostFunctinos/cmake-build-debug",
+		"source" : "/Users/keita-katsumi/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/Homework/GPU_Samples/HW1/HostFunctinos"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 6
+	}
+}
