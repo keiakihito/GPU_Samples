@@ -1,0 +1,143 @@
+//Input: 
+int numOfRow, number of row a matrix
+int numOfClm, number of column a matrix
+const float *ptr_h, dynamic array inital index address
+//Process: the function fills up random float number for matrix A and matrix B
+//Output: void
+void fillUpArray(int numOfRow, int numOfClm, const float *ptr_h)
+loop: rWkr starts 0 to numOfRow * numOfClm - 1
+	fill in random float to current rWkr and cWkr index
+
+//Input:
+int numOfRow, number of row a matrix
+int numOfClm, number of column a matrix
+const float *ptr_h, dynamic array inital index address
+//Process: the function fills up random float number for matrix A and matrix B
+//Output: void
+void printArray(int numOfRow, int numOfClm, const float *ptr_h)
+loop: rWkr starts 0 to numOfRow -1
+	loop: cWkr starts 0 to numOfClm -1
+		print current ptr_h[rWkr * numOfClm * 4 + cWkr * 4]
+
+//CPU function
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process matrix multiplicatoin C = AB
+//Output void.
+void basicSgemm_h(int m, int k, int n, const float *A_h, const float *B_h, float* C_h)
+loop: rWk starts 0 to m-1
+	loop: cWkr starts 0 to n-1
+		loop: kWkr starts 0 to k -1 where kWkr syncronizes matrix A row matrix B column
+			Multiply A_h[rWkr * numOfClm * 4 + kWkr * 4] * B_h[kWkr * numOfClm * 4 + cWkr * 4]
+			Sum result
+	Store result to C[rWkr][cWkr]
+
+
+
+//CUDA kernel
+//1. 1thread 1 element
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process A CUDA kernel where each thread computes one output matrix element
+//Output void.
+__gloval__ void matrixMulKernel_1thread1element(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Set max row index matrix A 
+Set max column index matrix A and matrix B 
+Set max column index matrix B
+Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
+Calculate offset for matrix A and matrix B
+Calculate total sum of matrix A row * matrix B column
+Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
+
+//2. 1thread 1 row
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process A CUDA kernel where each thread computes one output matrix row.
+//Output void
+__gloval__ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Set max row index matrix A 
+Set max column index matrix A and matrix B 
+Set max column index matrix B
+Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
+		
+		Parallel processing 
+		Calculate offset for matrix A and matrix B
+		Calculate total sum of matrix A row * matrix B column
+		Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
+		Exit when entire row index are fillied 
+
+//3. 1thread 1 column
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process A CUDA kernel where each thread computes one output matrix column.
+//Output void
+__gloval__ void matrixMulKernel_1thread1column(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Set max row index matrix A 
+Set max column index matrix A and matrix B 
+Set max column index matrix B
+Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
+		
+		Parallel processing 
+		Calculate offset for matrix A and matrix B
+		Calculate total sum of matrix A row * matrix B column
+		Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
+		Exit when entire column index are fillied 
+		
+
+//Host functions
+// For CUDA kernel 1
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process A host function for handling device memory allocation and free, data copy, and
+calling the specific CUDA kernel, matrixMulKernel_1thread1element().
+//Output void
+void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Allocate memory
+Copy data from host to device
+Set blockDim, gridDim
+Call matrixMulKernel_1thread1element
+Copy data from device to host
+Free device memory
+
+// For CUDA kernel 2 1thread1row
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process A host function for handling device memory allocation and free, data copy, and
+calling the specific CUDA kernel, matrixMulKernel_1thread1row().
+//Output void
+void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Allocate memory
+Copy data from host to device
+Set blockDim, gridDim
+Call matrixMulKernel_1thread1row
+Copy data from device to host
+Free device memory
+
+
+// For CUDA kernel 3 1thread1clumn
+//Input:
+int m, number of row matrixA
+int k, number of column matrixA, and number of row matrixB
+int n, number of column matrixB
+//Process  A host function for handling device memory allocation and copy, and calling the
+specific CUDA kernel, matrixMulKernel_1thread1column().
+//Output void
+void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+Allocate memory
+Copy data from host to device
+Set blockDim, gridDim
+Call matrixMulKernel_1thread1column
+Copy data from device to host
+Free device memory
