@@ -1,3 +1,5 @@
+#include <stdbool.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -30,6 +32,24 @@ void printArray(int numOfRow, int numOfClm, const float *ptr_h)
         printf("\n");
     }// end of outer loop
 } // end of printArray
+
+//Input:
+//float* CPU_Answer, the initial address of computation result of host function
+//float* GPU_Answer, the initial address of computation result of GPU matrix
+//unsigned int nRows, number of rows of each matrix
+//unsigned int nCols, number of colmuns of each matrix
+bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int nCols)
+{
+    const float epsilon = 10e-6;
+    float diff = 0.0f;
+    for (int rWkr = 0; rWkr < nRows; rWkr++) {
+        for (int cWkr = 0; cWkr < nCols; cWkr++) {
+            diff = fabs(CPU_Answer[rWkr*nCols + cWkr] - GPU_Answer[rWkr*nCols + cWkr]);
+            if (diff > epsilon) {return false; }
+        } // end of inner loop
+    }// end of outer loop
+    return true;
+} // end of verify
 
 
 //~~~~CUP function~~~~~
@@ -178,6 +198,9 @@ int main(void)
     printf("\nAnswer matrix D:\n");
     basicSgemm_h(m,k,n, ptr_A, ptr_B, ptr_D);
     printArray(m,n,ptr_D);
+
+    printf("%d\n",verify(ptr_A, ptr_B, m, n));
+    printf("%d\n",verify(ptr_C, ptr_D, m, n));
 
     return 0;
 }
