@@ -45,13 +45,15 @@ int n, number of column matrixB
 //Process A CUDA kernel where each thread computes one output matrix element
 //Output void.
 __gloval__ void matrixMulKernel_1thread1element(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
-Set max row index matrix A 
-Set max column index matrix A and matrix B 
-Set max column index matrix B
-Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
-Calculate offset for matrix A and matrix B
-Calculate total sum of matrix A row * matrix B column
-Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
+Set row global index matrix = blockIdx.y*blockDim.y + threadIdx.y;
+Set column global index matrix = blockIdx.x*blockDim.x + threadIdx.x;
+Set boundry as if (rowGlbIdx <  m,  clmGlbIdx < n)
+	Calculate offset for matrix A row and first column
+	Caliculate offset for matrix B first row and column
+	Decare float sum = 0.0
+	Loop: a walker iterates 0 to k-1 index
+		Calculate total sum of matrix A[rowGlbIdx*k + wkr] * matrix B[wkr*k+clmGlbIdx]
+	Store result to matrix C[rowGlb*k + colGlbIdx]. // ex, C[0][0] = row A[0] * column B[0]
 
 //2. 1thread 1 row
 //Input:
@@ -61,16 +63,15 @@ int n, number of column matrixB
 //Process A CUDA kernel where each thread computes one output matrix row.
 //Output void
 __gloval__ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
-Set max row index matrix A 
-Set max column index matrix A and matrix B 
-Set max column index matrix B
-Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
-		
-		Parallel processing 
-		Calculate offset for matrix A and matrix B
-		Calculate total sum of matrix A row * matrix B column
-		Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
-		Exit when entire row index are fillied 
+Set row global index = blockIdx.y*blockDim.y + threadIdx.y;
+Set boundry as if (rowGlbIdx <  m)
+	Calculate offset for matrix A row and first column
+	Caliculate offset for matrix B first row and column
+	Declare float sum = 0.0
+	Loop: an out walker iterates 0 to n-1 
+		Loop: an in walker iterates 0 to k-1 index
+			Calculate total sum of matrix A[rowGlbIdx*k + inWkr] * matrix B[inWkr*k+outWkr]
+		Store result to matrix C[rowGlbIdx*k + outWkr]. // ex, C[0][0] = row A[0] * column B[0]
 
 //3. 1thread 1 column
 //Input:
@@ -80,17 +81,16 @@ int n, number of column matrixB
 //Process A CUDA kernel where each thread computes one output matrix column.
 //Output void
 __gloval__ void matrixMulKernel_1thread1column(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
-Set max row index matrix A 
-Set max column index matrix A and matrix B 
-Set max column index matrix B
-Set boundry as rWkr <  max row index matrix A,  kWkr < max column index matrix A and matrix B, cWkr < max column index matrix B
-		
-		Parallel processing 
-		Calculate offset for matrix A and matrix B
-		Calculate total sum of matrix A row * matrix B column
-		Store result to matrix C correspoinding index. // ex, C[0][0] = row A[0] * column B[0]
-		Exit when entire column index are fillied 
-		
+Set column global index = blockIdx.x*blockDim.x + threadIdx.x;
+Set boundry as if (clmGlbIdx <  m)
+	Calculate offset for matrix A row and first column
+	Caliculate offset for matrix B first row and column
+	Declare float sum = 0.0
+	Loop: an out walker iterates 0 to n-1 
+		Loop: an in walker iterates 0 to k-1 index
+			Calculate total sum of matrix A[inWkr*k] * matrix B[inWkr*k + clmGlbIdx]
+		Store result to matrix C[outWkr*k + clmGlbIdx]. // ex, C[0][0] = row A[0] * column B[0]
+
 
 //Host functions
 // For CUDA kernel 1
