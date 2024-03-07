@@ -24,7 +24,7 @@ void fillUpArray(int numOfRow, int numOfClm, float *ptr_h)
 {
     for (int wkr = 0; wkr < numOfRow * numOfClm; wkr++) {
         // ptr_h[wkr] = (float)wkr+ 1.0;
-        ptr_h[wkr] = (float)rand()/(float)(RAND_MAX);
+        ptr_h[wkr] = rand()%100/100.0;
     }
 } // end of fillUpArray
 
@@ -182,7 +182,7 @@ __global__ void matrixMulKernel_1thread1column(int m, int k, int n, const float*
 
 int main(int argc, char** argv)
 {
-    int m =1000, k=1000, n= 1000;
+    int m =10,k=5,n=20;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     printf("\n Matrix A: \n");
