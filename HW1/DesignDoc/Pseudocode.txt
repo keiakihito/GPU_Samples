@@ -17,7 +17,22 @@ const float *ptr_h, dynamic array inital index address
 void printArray(int numOfRow, int numOfClm, const float *ptr_h)
 loop: rWkr starts 0 to numOfRow -1
 	loop: cWkr starts 0 to numOfClm -1
-		print current ptr_h[rWkr * numOfClm * 4 + cWkr * 4]
+		print current ptr_h[rWkr * numOfClm  + cWkr]
+
+
+//Input:
+//float* CPU_Answer, the initial address of computation result of host function
+//float* GPU_Answer, the initial address of computation result of GPU matrix
+//unsigned int nRows, number of rows of each matrix
+//unsigned int nCols, number of colmuns of each matrix
+bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int
+nCols)
+loop: rWkr starts 0 to numOfRow -1
+	loop: cWkr starts 0 to numOfClm -1
+		Check differnce CPU_Answer[rWkr * numOfClm  + cWkr] -  GPU_Answer[rWkr * numOfClm  + cWkr]
+		if the answer is greater epsilon 
+			return false
+return true
 
 //CPU function
 //Input:
@@ -82,13 +97,13 @@ int n, number of column matrixB
 //Output void
 __gloval__ void matrixMulKernel_1thread1column(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
 Set column global index = blockIdx.x*blockDim.x + threadIdx.x;
-Set boundry as if (clmGlbIdx <  m)
+Set boundry as if (clmGlbIdx <  n)
 	Calculate offset for matrix A row and first column
 	Caliculate offset for matrix B first row and column
 	Declare float sum = 0.0
-	Loop: an out walker iterates 0 to n-1 
+	Loop: an out walker iterates 0 to m-1 
 		Loop: an in walker iterates 0 to k-1 index
-			Calculate total sum of matrix A[inWkr*k] * matrix B[inWkr*k + clmGlbIdx]
+			Calculate total sum of matrix A[inWkr*k + inWkr] * matrix B[inWkr*k + clmGlbIdx]
 		Store result to matrix C[outWkr*k + clmGlbIdx]. // ex, C[0][0] = row A[0] * column B[0]
 
 

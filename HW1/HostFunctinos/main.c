@@ -92,16 +92,16 @@ void basicSgemm_h(int m, int k, int n, const float *A_h, const float *B_h, float
 void  matrixMulKernel_1thread1element(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
 {
     //Suppose I have 6 by 6 matrix
-    unsigned int rowGlbIdx = 0;
-    unsigned int clmGlbIdx = 0;
+    unsigned int rowGlbIdx = 3;
+    unsigned int clmGlbIdx = 7;
      float sum = 0.0f;
 
     //Boundry condition
     if(rowGlbIdx < m && clmGlbIdx < n) {
         for(unsigned int wkr = 0; wkr < k; wkr++) {
-            sum += A_d[rowGlbIdx*k + wkr] * B_d[wkr*k+clmGlbIdx];
+            sum += A_d[rowGlbIdx*k + wkr] * B_d[wkr*n+clmGlbIdx];
         }
-        C_d[rowGlbIdx*k + clmGlbIdx] = sum;
+        C_d[rowGlbIdx*n + clmGlbIdx] = sum;
     } // end of if
 
 }// end of matrixMulKernel_1thread1element
@@ -117,7 +117,7 @@ void  matrixMulKernel_1thread1element(int m, int k, int n, const float* A_d, con
 void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
 {
     //Suppose I have 6 by 6 matrix
-    unsigned int rowGlbIdx = 0;
+    unsigned int rowGlbIdx = 5;
     float sum = 0.0f;
 
     //Boundry condition
@@ -126,7 +126,7 @@ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const fl
             for(unsigned int inWkr = 0; inWkr < k; inWkr++) {
                 sum += A_d[rowGlbIdx*k + inWkr] * B_d[inWkr*k + outWkr];
             } // end of inner loop
-            C_d[rowGlbIdx*k + outWkr] = sum;
+            C_d[rowGlbIdx*n + outWkr] = sum;
             sum = 0.0f;
         } // end of outer loop
 
@@ -144,16 +144,18 @@ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const fl
 void matrixMulKernel_1thread1column(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
 {
     //Suppose I have 6 by 6 matrix
-    unsigned int clmGlbIdx = 6;
+    unsigned int clmGlbIdx = 9;
     float sum = 0.0f;
 
     //Boundry condition
     if(clmGlbIdx < n) {
         for (unsigned int outWkr = 0; outWkr <m; outWkr++) {
             for(unsigned int inWkr = 0; inWkr < k; inWkr++) {
-                sum += A_d[outWkr*k+inWkr] * B_d[inWkr*k + clmGlbIdx];
+                // printf("\nA_d: %d", A_d[outWkr*k+inWkr] );
+                // printf("\nB_d: %d", B_d[inWkr*n + clmGlbIdx]);
+                sum += A_d[outWkr*k+inWkr] * B_d[inWkr*n + clmGlbIdx];
             } // end of inner loop
-            C_d[outWkr*k + clmGlbIdx] = sum;
+            C_d[outWkr*n + clmGlbIdx] = sum;
             sum = 0.0f;
         } // end of outer loop
 
@@ -164,7 +166,7 @@ void matrixMulKernel_1thread1column(int m, int k, int n, const float* A_d, const
 
 int main(void)
 {
-    int m = 6, k = 6, n = 6;
+    int m = 5, k = 1, n = 10;
 
     float* ptr_A = malloc((m * k) * sizeof(float));
     printf("\n Matrix A: \n");
@@ -185,7 +187,7 @@ int main(void)
     // printf("\n1thread1element\n");
     // matrixMulKernel_1thread1element(m,k,n, ptr_A, ptr_B,ptr_C);
     // printArray(m,n,ptr_C);
-    //
+
     // printf("\n1thread1row\n");
     // matrixMulKernel_1thread1row(m,k,n, ptr_A, ptr_B,ptr_C);
     // printArray(m,n,ptr_C);
