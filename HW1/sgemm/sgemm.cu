@@ -23,7 +23,8 @@ exit(-1); \
 void fillUpArray(int numOfRow, int numOfClm, float *ptr_h)
 {
     for (int wkr = 0; wkr < numOfRow * numOfClm; wkr++) {
-        ptr_h[wkr] = (float)wkr + 1.0;
+        // ptr_h[wkr] = (float)wkr+ 1.0;
+        ptr_h[wkr] = (float)rand()/(float)(RAND_MAX);
     }
 } // end of fillUpArray
 
@@ -50,12 +51,18 @@ void printArray(int numOfRow, int numOfClm, const float *ptr_h)
 //unsigned int nCols, number of colmuns of each matrix
 bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int nCols)
 {
-    const float epsilon = 10e-6;
+    const float epsilon = 10e-5;
     float diff = 0.0f;
     for (int rWkr = 0; rWkr < nRows; rWkr++) {
         for (int cWkr = 0; cWkr < nCols; cWkr++) {
             diff = fabs(CPU_Answer[rWkr*nCols + cWkr] - GPU_Answer[rWkr*nCols + cWkr]);
-            if (diff > epsilon) {return false; }
+            if (diff > epsilon) {
+                printf("\nrow: %d\n", rWkr);
+                printf("column: %d\n", cWkr);
+                printf("CPU: %f\n", CPU_Answer[rWkr*nCols + cWkr]);
+                printf("GPU: %f\n", GPU_Answer[rWkr*nCols + cWkr]);
+                return false;
+            }
         } // end of inner loop
     }// end of outer loop
     return true;
@@ -109,7 +116,7 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
     //Boundry condition
     if(rowGlbIdx < m && clmGlbIdx < n) {
         for(unsigned int wkr = 0; wkr < k; wkr++) {
-            sum += A_d[rowGlbIdx*k + wkr] * B_d[wkr*k+clmGlbIdx];
+            sum += A_d[rowGlbIdx*k + wkr] * B_d[wkr*n+clmGlbIdx];
         }
         C_d[rowGlbIdx*k + clmGlbIdx] = sum;
     } // end of if
@@ -175,17 +182,17 @@ __global__ void matrixMulKernel_1thread1column(int m, int k, int n, const float*
 
 int main(int argc, char** argv)
 {
-    int m = 3, k = 3, n = 3;
+    int m =1000, k=1000, n= 1000;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     printf("\n Matrix A: \n");
     fillUpArray(m, k, ptrMtxA_h);
-    printArray(m, k, ptrMtxA_h);
+    // printArray(m, k, ptrMtxA_h);
 
     printf("\n Matrix B: \n");
     float* ptrMtxB_h = (float*)malloc((k * n) * sizeof(float));
     fillUpArray(k, n, ptrMtxB_h);
-    printArray(k, n, ptrMtxB_h);
+    // printArray(k, n, ptrMtxB_h);
 
     float* ptrMtxC_h = (float*)malloc((m * n) * sizeof(float));
     float* ptrMtxD_h = (float*)malloc((m * n) * sizeof(float));
@@ -210,21 +217,21 @@ int main(int argc, char** argv)
     dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
 
     //2.1
-    // matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+    matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
     // 2.2
     // matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
     //2.3
-    matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+    // matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
 
     //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
     CHECK(cudaMemcpy(ptrMtxD_h, ptrMtxD_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
     printf("\n Matrix C: \n");
-    printArray(m,n, ptrMtxC_h);
+    // printArray(m,n, ptrMtxC_h);
     printf("\n Matrix D: \n");
-    printArray(m,n, ptrMtxD_h);
+    // printArray(m,n, ptrMtxD_h);
 
     printf("\nIs Matrix C == Matirx D? : ");
     printf("%d\n",verify(ptrMtxC_h, ptrMtxD_h, m,n));
