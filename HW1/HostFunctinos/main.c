@@ -124,7 +124,7 @@ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_d, const fl
     if(rowGlbIdx < m) {
         for (unsigned int outWkr = 0; outWkr <n; outWkr++) {
             for(unsigned int inWkr = 0; inWkr < k; inWkr++) {
-                sum += A_d[rowGlbIdx*k + inWkr] * B_d[inWkr*k + outWkr];
+                sum += A_d[rowGlbIdx*k + inWkr] * B_d[inWkr*n + outWkr];
             } // end of inner loop
             C_d[rowGlbIdx*n + outWkr] = sum;
             sum = 0.0f;

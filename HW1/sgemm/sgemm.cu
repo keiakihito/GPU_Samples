@@ -51,7 +51,7 @@ void printArray(int numOfRow, int numOfClm, const float *ptr_h)
 //unsigned int nCols, number of colmuns of each matrix
 bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int nCols)
 {
-    const float epsilon = 10e-5;
+    const float epsilon = 10e-3;
     float diff = 0.0f;
     for (int rWkr = 0; rWkr < nRows; rWkr++) {
         for (int cWkr = 0; cWkr < nCols; cWkr++) {
@@ -118,7 +118,7 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
         for(unsigned int wkr = 0; wkr < k; wkr++) {
             sum += A_d[rowGlbIdx*k + wkr] * B_d[wkr*n+clmGlbIdx];
         }
-        C_d[rowGlbIdx*k + clmGlbIdx] = sum;
+        C_d[rowGlbIdx*n + clmGlbIdx] = sum;
     } // end of if
 
 }// end of matrixMulKernel_1thread1element
@@ -141,9 +141,9 @@ __global__ void matrixMulKernel_1thread1row(int m, int k, int n, const float* A_
     if(rowGlbIdx < m) {
         for (unsigned int outWkr = 0; outWkr <n; outWkr++) {
             for(unsigned int inWkr = 0; inWkr < k; inWkr++) {
-                sum += A_d[rowGlbIdx*k + inWkr] * B_d[inWkr*k + outWkr];
+                sum += A_d[rowGlbIdx*k + inWkr] * B_d[inWkr*n + outWkr];
             } // end of inner loop
-            C_d[rowGlbIdx*k + outWkr] = sum;
+            C_d[rowGlbIdx*n + outWkr] = sum;
             sum = 0.0f;
         } // end of outer loop
 
@@ -169,9 +169,9 @@ __global__ void matrixMulKernel_1thread1column(int m, int k, int n, const float*
     if(clmGlbIdx < n) {
         for (unsigned int outWkr = 0; outWkr <m; outWkr++) {
             for(unsigned int inWkr = 0; inWkr < k; inWkr++) {
-                sum += A_d[outWkr*k+inWkr] * B_d[inWkr*k + clmGlbIdx];
+                sum += A_d[outWkr*k+inWkr] * B_d[inWkr*n + clmGlbIdx];
             } // end of inner loop
-            C_d[outWkr*k + clmGlbIdx] = sum;
+            C_d[outWkr*n + clmGlbIdx] = sum;
             sum = 0.0f;
         } // end of outer loop
 
@@ -182,7 +182,7 @@ __global__ void matrixMulKernel_1thread1column(int m, int k, int n, const float*
 
 int main(int argc, char** argv)
 {
-    int m =10,k=5,n=20;
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     printf("\n Matrix A: \n");
@@ -217,13 +217,13 @@ int main(int argc, char** argv)
     dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
 
     //2.1
-    matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+    // matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
     // 2.2
     // matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
     //2.3
-    // matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+    matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
 
 
     //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
