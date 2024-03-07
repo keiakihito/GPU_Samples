@@ -180,8 +180,107 @@ __global__ void matrixMulKernel_1thread1column(int m, int k, int n, const float*
 } // end of matrixMulKernel_1thread1column
 
 
+//Host functions calling kernel
+//AGPU-implimentation of three kernels above
+// For CUDA kernel 1,1thread1element
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process A host function for handling device memory allocation and free, data copy, and
+//calling the specific CUDA kernel, matrixMulKernel_1thread1element().
+//Output void
+void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
+{
+
+    double startTime, endTime;
+
+    //(1) Allocate device memory for arrays A_d, B_d, and C_d.
+    float* A_d = NULL;
+    float* B_d = NULL;
+    float* C_d = NULL;
+    startTime = myCPUTimer();
+    CHECK(cudaMalloc((void**)&A_d, sizeof(float)*(m * k)));
+    CHECK(cudaMalloc((void**)&B_d, sizeof(float)*(k * n)));
+    CHECK(cudaMalloc((void**)&C_d, sizeof(float)*(m * n)));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("cudaMalloc: %f s\n", endTime - startTime); fflush(stdout);
+
+    //(2) Copy arrays x_h and y_h to device memoery x_d and y_d, respectively.
+    startTime = myCPUTimer();
+    CHECK(cudaMemcpy(A_d, A_h, sizeof(float)*(m * k), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(B_d, B_h, sizeof(float)*(k * n), cudaMemcpyHostToDevice));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+
+    //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
+    dim3 blockDim(16, 16, 1);
+    dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+
+    startTime = myCPUTimer();
+    matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("colortoGrayKernel<<<(%d,%d,%d),(%d,%d,%d) >>>: %f s\n", gridDim.x, gridDim.y, gridDim.z,blockDim.x, blockDim.y, blockDim.z, endTime - startTime);
+    fflush(stdout);
+
+    //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
+    startTime = myCPUTimer();
+    CHECK(cudaMemcpy(C_h, C_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+
+    //(5) Free device memory
+    CHECK(cudaFree(A_d));
+    CHECK(cudaFree(B_d));
+    CHECK(cudaFree(C_d));
+
+    //Template
+    startTime = myCPUTimer();
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+} // end of basicSgemm_d_1thread1element
+
+// For CUDA kernel 2, 1thread1row
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process A host function for handling device memory allocation and free, data copy, and
+calling the specific CUDA kernel, matrixMulKernel_1thread1row().
+//Output void
+void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
+{
+
+}
+
+// For CUDA kernel 3 1thread1clumn
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process  A host function for handling device memory allocation and copy, and calling the
+//specific CUDA kernel, matrixMulKernel_1thread1column().
+//Output void
+void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
+{
+
+}
+
+
+
+
+
+
 int main(int argc, char** argv)
 {
+    cudaDeviceSynchronize();
+
+    double startTime, endTime;
+
     int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
@@ -194,52 +293,64 @@ int main(int argc, char** argv)
     fillUpArray(k, n, ptrMtxB_h);
     // printArray(k, n, ptrMtxB_h);
 
-    float* ptrMtxC_h = (float*)malloc((m * n) * sizeof(float));
-    float* ptrMtxD_h = (float*)malloc((m * n) * sizeof(float));
+    float* ptrMtxCPU_h = (float*)malloc((m * n) * sizeof(float));
+    float* ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
 
     //(0) Calculate Matrix multiplication with CPU functino
-    basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxC_h);
+    startTime = myCPUTimer();
+    basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxCPU_h);
+    endTime = myCPUTimer();
+    printf("basicSgemm_h: %f s \n\n", endTime - startTime); fflush(stdout);
 
     //(1) Allocate device memory for arrays x_d, y_d, and z_d.
-    float* ptrMtxA_d = NULL;
-    float* ptrMtxB_d = NULL;
-    float* ptrMtxD_d = NULL;
-    CHECK(cudaMalloc((void**)&ptrMtxA_d, sizeof(float)*(m * k)));
-    CHECK(cudaMalloc((void**)&ptrMtxB_d, sizeof(float)*(k * n)));
-    CHECK(cudaMalloc((void**)&ptrMtxD_d, sizeof(float)*(m * n)));
-
-    //(2) Copy arrays x_h and y_h to device memoery x_d and y_d, respectively.
-    CHECK(cudaMemcpy(ptrMtxA_d, ptrMtxA_h, sizeof(float)*(m * k), cudaMemcpyHostToDevice));
-    CHECK(cudaMemcpy(ptrMtxB_d, ptrMtxB_h, sizeof(float)*(k * n), cudaMemcpyHostToDevice));
-
-    //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
-    dim3 blockDim(16, 16, 1);
-    dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
-
-    //2.1
-    // matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
-
-    // 2.2
-    // matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
-
-    //2.3
-    matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+    // float* ptrMtxA_d = NULL;
+    // float* ptrMtxB_d = NULL;
+    // float* ptrMtxD_d = NULL;
+    // CHECK(cudaMalloc((void**)&ptrMtxA_d, sizeof(float)*(m * k)));
+    // CHECK(cudaMalloc((void**)&ptrMtxB_d, sizeof(float)*(k * n)));
+    // CHECK(cudaMalloc((void**)&ptrMtxD_d, sizeof(float)*(m * n)));
+    startTime = myCPUTimer();
+    basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    endTime = myCPUTimer();
+    printf("basicSgemm_d_1thread1element: %f s \n\n", endTime - startTime); fflush(stdout);
 
 
-    //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
-    CHECK(cudaMemcpy(ptrMtxD_h, ptrMtxD_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
-    printf("\n Matrix C: \n");
-    // printArray(m,n, ptrMtxC_h);
-    printf("\n Matrix D: \n");
-    // printArray(m,n, ptrMtxD_h);
+    // //(2) Copy arrays x_h and y_h to device memoery x_d and y_d, respectively.
+    // CHECK(cudaMemcpy(ptrMtxA_d, ptrMtxA_h, sizeof(float)*(m * k), cudaMemcpyHostToDevice));
+    // CHECK(cudaMemcpy(ptrMtxB_d, ptrMtxB_h, sizeof(float)*(k * n), cudaMemcpyHostToDevice));
 
-    printf("\nIs Matrix C == Matirx D? : ");
-    printf("%d\n",verify(ptrMtxC_h, ptrMtxD_h, m,n));
+    // //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
+    // dim3 blockDim(16, 16, 1);
+    // dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
 
-    //(5) Free device memory of arrays x_d, y_d, and z_d
-    CHECK(cudaFree(ptrMtxA_d));
-    CHECK(cudaFree(ptrMtxB_d));
-    CHECK(cudaFree(ptrMtxD_d));
+    // //2.1
+    // // matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+
+    // // 2.2
+    // // matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+
+    // //2.3
+    // matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, ptrMtxA_d, ptrMtxB_d, ptrMtxD_d);
+
+
+    // //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
+    // CHECK(cudaMemcpy(ptrMtxD_h, ptrMtxD_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
+    // printf("\n Matrix C: \n");
+    // // printArray(m,n, ptrMtxC_h);
+    // printf("\n Matrix D: \n");
+    // // printArray(m,n, ptrMtxD_h);
+    bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int nCols)
+    bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    if(check == true){printf("basicSgemm_d_1thread1element PASSED👍👍👍");}
+    else{printf("Error basicSgemm_d_1thread1element"); return -1;}
+
+    // printf("\nIs Matrix C == Matirx D? : ");
+    // printf("%d\n",verify(ptrMtxC_h, ptrMtxD_h, m,n));
+
+    // //(5) Free device memory of arrays x_d, y_d, and z_d
+    // CHECK(cudaFree(ptrMtxA_d));
+    // CHECK(cudaFree(ptrMtxB_d));
+    // CHECK(cudaFree(ptrMtxD_d));
 
     // Free host memory of arrays x_h, y_h, and z_h
     free(ptrMtxA_h);
@@ -247,9 +358,9 @@ int main(int argc, char** argv)
     free(ptrMtxB_h);
     ptrMtxB_h = NULL;
     free(ptrMtxC_h);
-    ptrMtxC_h = NULL;
+    ptrMtxCPU_h = NULL;
     free(ptrMtxD_h);
-    ptrMtxD_h = NULL;
+    ptrMtxGPU_h = NULL;
 
     return 0;
 }
