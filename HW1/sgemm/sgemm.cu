@@ -13,6 +13,12 @@ exit(-1); \
 }\
 }
 
+double myCPUTimer(){
+    struct timeval tp;
+    gettimeofday(&tp, NULL);
+    return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
+}
+
 //~~~Helper fundtions
 //Input:
 //int numOfRow, number of row a matrix
@@ -250,7 +256,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //int k, number of column matrixA, and number of row matrixB
 //int n, number of column matrixB
 //Process A host function for handling device memory allocation and free, data copy, and
-calling the specific CUDA kernel, matrixMulKernel_1thread1row().
+//calling the specific CUDA kernel, matrixMulKernel_1thread1row().
 //Output void
 void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
@@ -281,7 +287,7 @@ int main(int argc, char** argv)
 
     double startTime, endTime;
 
-    int m =1234, k= 1567, n=1890;
+    int m =500, k= 250, n=200;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     printf("\n Matrix A: \n");
@@ -339,7 +345,6 @@ int main(int argc, char** argv)
     // // printArray(m,n, ptrMtxC_h);
     // printf("\n Matrix D: \n");
     // // printArray(m,n, ptrMtxD_h);
-    bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned int nCols)
     bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
     if(check == true){printf("basicSgemm_d_1thread1element PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1element"); return -1;}
@@ -357,9 +362,9 @@ int main(int argc, char** argv)
     ptrMtxA_h = NULL;
     free(ptrMtxB_h);
     ptrMtxB_h = NULL;
-    free(ptrMtxC_h);
+    free(ptrMtxCPU_h);
     ptrMtxCPU_h = NULL;
-    free(ptrMtxD_h);
+    free(ptrMtxGPU_h);
     ptrMtxGPU_h = NULL;
 
     return 0;
