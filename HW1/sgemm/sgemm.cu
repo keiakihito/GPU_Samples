@@ -377,7 +377,18 @@ int main(int argc, char** argv)
 
     double startTime, endTime;
 
-    int m =500, k= 250, n=200;
+    if (argc < 4) {
+        fprintf(stderr, "Usage: %s <m> <k> <n>\n", argv[0]);
+        return -1;
+    }
+
+    // Convert arguments to integers
+    int m = atoi(argv[1]);
+    int k = atoi(argv[2]);
+    int n = atoi(argv[3]);
+
+    // For direct input
+    // int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
