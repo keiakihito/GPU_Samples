@@ -221,7 +221,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
     endTime = myCPUTimer();
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
-    dim3 blockDim(16, 16, 1);
+    dim3 blockDim(32, 32, 1);
     dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
 
     startTime = myCPUTimer();
