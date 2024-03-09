@@ -200,7 +200,6 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 {
     printf("\n~~~basicSgemm_d_1thread1element~~~");
     double startTime, endTime;
-
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
     float* A_d = NULL;
     float* B_d = NULL;
@@ -222,7 +221,8 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32, 1);
-    dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    dim3 gridDim(ceil((float)n/1024), ceil((float)m/1024),1);
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -280,7 +280,8 @@ void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32, 1);
-    dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    dim3 gridDim(ceil((float)n/ 1024), ceil((float)m/1024),1);
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -338,7 +339,8 @@ void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const fl
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32, 1);
-    dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    dim3 gridDim(ceil((float)n/1024), ceil((float)m/1024),1);
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
