@@ -200,6 +200,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 {
     printf("\n~~~basicSgemm_d_1thread1element~~~");
     double startTime, endTime;
+    const int THREADS_PER_BLOCK = 1024;
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
     float* A_d = NULL;
     float* B_d = NULL;
@@ -220,15 +221,14 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
     endTime = myCPUTimer();
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
-    dim3 blockDim(32, 32, 1);
-    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
-    dim3 gridDim(ceil((float)n/1024), ceil((float)m/1024),1);
+    dim3 blockDim(32, 32);
+    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
-    printf("matrixMulKernel_1thread1element<<<(%d,%d,%d),(%d,%d,%d) >>>: %f s\n", gridDim.x, gridDim.y, gridDim.z,blockDim.x, blockDim.y, blockDim.z, endTime - startTime);
+    printf("matrixMulKernel_1thread1element<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim.y,blockDim.x, blockDim.y, endTime - startTime);
     fflush(stdout);
 
     //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
@@ -257,6 +257,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
     double startTime, endTime;
+    const int THREADS_PER_BLOCK = 1024;
 
     printf("\n\n\n~~~basicSgemm_d_1thread1row~~~");
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
@@ -279,15 +280,15 @@ void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float
     endTime = myCPUTimer();
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
-    dim3 blockDim(32, 32, 1);
-    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
-    dim3 gridDim(ceil((float)n/ 1024), ceil((float)m/1024),1);
+    dim3 blockDim(32, 32);
+    // dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
+    dim3 gridDim(ceil((float)n/ THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
-    printf("matrixMulKernel_1thread1row<<<(%d,%d,%d),(%d,%d,%d) >>>: %f s\n", gridDim.x, gridDim.y, gridDim.z,blockDim.x, blockDim.y, blockDim.z, endTime - startTime);
+    printf("matrixMulKernel_1thread1row<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim.y,blockDim.x, blockDim.y, endTime - startTime);
     fflush(stdout);
 
     //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
@@ -316,6 +317,8 @@ void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float
 void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
     double startTime, endTime;
+    const int THREADS_PER_BLOCK = 1024;
+
 
     printf("\n\n\n~~~basicSgemm_d_1thread1column~~~");
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
@@ -338,15 +341,14 @@ void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const fl
     endTime = myCPUTimer();
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
-    dim3 blockDim(32, 32, 1);
-    //dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
-    dim3 gridDim(ceil((float)n/1024), ceil((float)m/1024),1);
+    dim3 blockDim(32, 32);
+    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
-    printf("matrixMulKernel_1thread1column<<<(%d,%d,%d),(%d,%d,%d) >>>: %f s\n", gridDim.x, gridDim.y, gridDim.z,blockDim.x, blockDim.y, blockDim.z, endTime - startTime);
+    printf("matrixMulKernel_1thread1column<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim.y,blockDim.x, blockDim.y, endTime - startTime);
     fflush(stdout);
 
     //(4) Copy the result data from the device memory of array z_d to the host memory of array z_h.
@@ -379,17 +381,12 @@ int main(int argc, char** argv)
 
     double startTime, endTime;
 
-    // if (argc < 4) {
-    //     fprintf(stderr, "Usage: %s <m> <k> <n>\n", argv[0]);
-    //     return -1;
-    // }
-
-    // // Convert arguments to integers
+    // Convert arguments to integers
     // int m = atoi(argv[1]);
     // int k = atoi(argv[2]);
     // int n = atoi(argv[3]);
 
-    // For direct input
+    // // For direct input
     int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
@@ -398,9 +395,9 @@ int main(int argc, char** argv)
     float* ptrMtxB_h = (float*)malloc((k * n) * sizeof(float));
     fillUpArray(k, n, ptrMtxB_h);
 
-
-    float* ptrMtxCPU_h = (float*)malloc((m * n) * sizeof(float));
-    float* ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
+    //Initialize to 0
+    float* ptrMtxCPU_h = (float*)calloc(m * n, sizeof(float));
+    float* ptrMtxGPU_h = (float*)calloc(m * n, sizeof(float));
 
 
 
