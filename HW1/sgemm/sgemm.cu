@@ -1,3 +1,22 @@
+/**
+ * file name, sgemm.cu
+ * Author Keita Katsumi
+ * CS 4990 Spring  2024
+ * matrix- multiplication C = AB with CPU and GPU kernels
+ *
+ * Description:
+ * The program takes three arguments m, k, n and calculate matrix multiplication.
+ * The program measure excution time with a myCPUTimer function for these functions
+ * 1. basicSgemm_h, three nested loop matrix matltiplication in CPU
+ * 2. basicSgemm_d_1thread1element, calling GPU kernel which computation result is 1 cell
+ * 3. basicSgemm_d_1thread1row, calling GPU kernel which computation result is 1 row
+ * 4. basicSgemm_d_1thread1element, calling GPU kernel which computation result is 1 column
+ * After calling three GPU function, it compares CPU matrix result to verify calculation result. 
+ *
+ * Last modified March 10th , 2024
+ */
+
+
 #include <stdbool.h>
 #include <math.h>
 #include <stdio.h>
@@ -399,20 +418,22 @@ int main(int argc, char** argv)
     float* ptrMtxCPU_h = (float*)calloc(m * n, sizeof(float));
     float* ptrMtxGPU_h = (float*)calloc(m * n, sizeof(float));
 
-
-
-
-    //Calculate Matrix multiplication with CPU functinon
     printf("\nm: %d, k: %d, n: %d\n", m, k, n);
     printf("Size of matrix product will be %d by %d\n", m, n);
     printf("\n~~~CPU hostfunction~~~\n");
 
-    //1thread 1 element
+
+
+    //(1)  Calculate Matrix multiplication with CPU functinon
     startTime = myCPUTimer();
     basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxCPU_h);
     endTime = myCPUTimer();
     printf("basicSgemm_h on CPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
+
+
+    //Calling Kernel
+    //(2) 1thread1element
     startTime = myCPUTimer();
     basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
     endTime = myCPUTimer();
@@ -425,7 +446,7 @@ int main(int argc, char** argv)
 
 
 
-    //1thread 1 row
+    //(3) 1thread 1 row
     ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
     startTime = myCPUTimer();
     basicSgemm_d_1thread1row(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
@@ -439,7 +460,7 @@ int main(int argc, char** argv)
 
 
 
-    //1thread 1 column
+    //(4) 1thread 1 column
     ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
     startTime = myCPUTimer();
     basicSgemm_d_1thread1column(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
@@ -447,7 +468,7 @@ int main(int argc, char** argv)
     printf("basicSgemm_d_1thread1column on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
     check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    if(check == true){printf("VERIFY: basicSgemm_d_1thread1column PASSED👍👍👍");}
+    if(check == true){printf("VERIFY: basicSgemm_d_1thread1column PASSED👍👍👍\n\n");}
     else{printf("Error basicSgemm_d_1thread1column"); return -1;}
 
     // Free host memory of arrays x_h, y_h, and z_h
