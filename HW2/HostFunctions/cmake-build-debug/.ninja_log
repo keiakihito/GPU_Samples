@@ -1,0 +1,4 @@
+# ninja log v5
+1	50	1710731960799393136	build.ninja	db8d21fb3111b2ad
+1	47	1710356205968200629	CMakeFiles/HostFunctions.dir/main.c.o	a532ff5697c95a38
+48	89	1710356206008772342	HostFunctions	e5a366e8e7d4b64c
