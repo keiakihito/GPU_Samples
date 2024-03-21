@@ -87,8 +87,8 @@ int main(int argc, char** argv){
 
 				printf("Total amount of global memory: %.1f GB\n", (float)deviceProp.totalGlobalMem / (1024 * 1024 * 1024));
 				printf("Total amount of constant memory: %.1f KB\n", (float)deviceProp.totalConstMem/1024);
-				printf("Maximum amount of shared memory available per block: %.1fKB", (float)deviceProp.sharedMemPerBlock/1024); // Maximum amount of shared memory available to a thread blck in bytes
-				printf("(Maximum amount of shared memory available per SM): %.1fKB", (float)deviceProp.sharedMemPerMultiprocessor/1024); // Maximum amount of shared memory avaialble to a mutiprocessor in byte.
+				printf("Maximum amount of shared memory available per block: %.1fKB\n", (float)deviceProp.sharedMemPerBlock/1024); // Maximum amount of shared memory available to a thread blck in bytes
+				printf("(Maximum amount of shared memory available per SM): %.1fKB\n", (float)deviceProp.sharedMemPerMultiprocessor/1024); // Maximum amount of shared memory avaialble to a mutiprocessor in byte.
 				printf("Maximum memory pitch: %.1f GB\n", (float)deviceProp.memPitch/(1024*1024*1024)); //is the maximum pitch allowed by the meory copy functinos 
 
 				printf("Total numberof registers available per block: %d\n", deviceProp.regsPerBlock);
