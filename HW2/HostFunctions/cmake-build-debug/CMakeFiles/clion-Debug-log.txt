@@ -1,4 +1,4 @@
 "/Users/keita-katsumi/Applications/CLion Nova.app/Contents/bin/cmake/mac/aarch64/bin/cmake" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=/Users/keita-katsumi/Applications/CLion Nova.app/Contents/bin/ninja/mac/aarch64/ninja" -G Ninja -S /Users/keita-katsumi/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/Homework/GPU_Samples/HW2/HostFunctions -B /Users/keita-katsumi/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/Homework/GPU_Samples/HW2/HostFunctions/cmake-build-debug
--- Configuring done (0.1s)
+-- Configuring done (0.0s)
 -- Generating done (0.0s)
 -- Build files have been written to: /Users/keita-katsumi/Dropbox/Academic/CalPolyPomona/2024/Spring2024/CS4990/Homework/GPU_Samples/HW2/HostFunctions/cmake-build-debug
