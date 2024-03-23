@@ -419,8 +419,8 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    // int m =77, k= 77, n=77;
-    int m =78, k= 78, n=78;
+    int m =77, k= 77, n=77;
+    // int m =78, k= 78, n=78;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
@@ -438,26 +438,26 @@ int main(int argc, char** argv)
 
 
 
-    // //(1)  Calculate Matrix multiplication with CPU functinon
-    // startTime = myCPUTimer();
-    // basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxCPU_h);
-    // endTime = myCPUTimer();
-    // printf("basicSgemm_h on CPU: %f s \n\n", endTime - startTime); fflush(stdout);
-    //
+    //(1)  Calculate Matrix multiplication with CPU functinon
+    startTime = myCPUTimer();
+    basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxCPU_h);
+    endTime = myCPUTimer();
+    printf("basicSgemm_h on CPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
 
-    // //Calling Kernel
-    // //(2) 1thread1element
-    // startTime = myCPUTimer();
-    // basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
-    // endTime = myCPUTimer();
-    // printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
-    //
-    // bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    // if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
-    // else{printf("Error basicSgemm_d_1thread1element"); return -1;}
-    // free(ptrMtxGPU_h);
-    //
+
+    //Calling Kernel
+    //(2) 1thread1element
+    startTime = myCPUTimer();
+    basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    endTime = myCPUTimer();
+    printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
+
+    bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
+    else{printf("Error basicSgemm_d_1thread1element"); return -1;}
+    free(ptrMtxGPU_h);
+
 
 
     //(3) Tiled GPU matrix multiplication
@@ -467,9 +467,9 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("basicSgemm_d_tiled on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    // check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    if(check == true){printf("VERIFY: basicSgemm_d_1thread1row PASSED👍👍👍");}
+    // bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    if(check == true){printf("VERIFY: basicSgemm_d_Tile PASSED👍👍👍\n\n");}
     else{printf("Error basicSgemm_d_1thread1row"); return -1;}
 
 
