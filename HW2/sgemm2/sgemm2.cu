@@ -180,7 +180,10 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
     //Each matrix can use 24KB shared memoery space.
     //Tile width will be 24kb / 4byte for float = 6177 cells in 1 matrix
     //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
-    int const TILE_WIDTH = floor(sqrt(Adz_sz / (float)2  / 4));
+    // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
+    // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
+    int const TILE_WIDTH = floor(sqrt(Adz_sz / (float)4));
+    // printf("\nsqrt(Adz_sz/2/4)TILE_WIDTH : %d", TILE_WIDTH);
     // if(debug){
     //     printf("\nTILE_WIDTH : %d", TILE_WIDTH);
     // }
@@ -192,9 +195,9 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
     float sum = 0.0f;
     int numOfTile = (k / (float)TILE_WIDTH);
-    if(debug){
-        printf("\nNumber of Tile : %d", numOfTile);
-    }
+    // if(debug){
+    //     printf("\nNumber of Tile : %d", numOfTile);
+    // }
 
     //Outer loop iterates 0 through last tile
     //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
@@ -332,7 +335,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //Output void
 void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
-    bool debug = false;
+    bool debug = true;
     double startTime, endTime;
     const int THREADS_PER_BLOCK = 1024;
 
@@ -364,10 +367,11 @@ void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h,
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
     size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
-
     if(debug){
         printf("\nDevices %d: %s", device, deviceProp.name);
         printf("\nMaximum amount of shared memory available per block: %.1fKB\n", (float)deviceProp.sharedMemPerBlock/1024);
+        printf("\nMaximum memeory available for tiled matrix: %.1f\n", size/2);
+
     }
 
     dim3 blockDim(32, 32);
@@ -415,7 +419,8 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    int m =1234, k= 1567, n=1890;
+    // int m =77, k= 77, n=77;
+    int m =78, k= 78, n=78;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
