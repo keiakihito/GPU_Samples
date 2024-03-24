@@ -593,14 +593,14 @@ int main(int argc, char** argv)
     double startTime, endTime;
 
     // Convert arguments to integers
-    // int m = atoi(argv[1]);
-    // int k = atoi(argv[2]);
-    // int n = atoi(argv[3]);
+    int m = atoi(argv[1]);
+    int k = atoi(argv[2]);
+    int n = atoi(argv[3]);
 
     // // For direct input
     // int m =8, k= 4, n=8;
     // int m = 30, k=30, n=30;
-    int m =1234, k= 1567, n=1890;
+    // int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
