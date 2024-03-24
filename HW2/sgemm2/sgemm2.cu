@@ -271,7 +271,10 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
     //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
     // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
     // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
-    int const TILE_WIDTH = 2;
+    
+    //This is for Volta and Maxell, which avaialbe shared memory per block is 48k. 
+    //And calculate valid TILE_WIDTH is 26.
+    int const TILE_WIDTH = 26;
 
     __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
     __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
@@ -550,10 +553,10 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
         printf("\nMaximum memeory available for tiled matrix: %.1f\n", size/2);
 
     }
-
-    dim3 blockDim(2, 2);
+    int threadPerBlock = getThreadPerBlock(size);
+    dim3 blockDim(threadPerBlock, threadPerBlock);
     // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
-    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+    dim3 gridDim(ceil((float)n/threadPerBlock), ceil((float)m/threadPerBlock));
 
 
     startTime = myCPUTimer();
@@ -602,9 +605,9 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    int m =8, k= 4, n=8;
-    // int m = 78, k=78, n=78;
-    // int m =1234, k= 1567, n=1890;
+    // int m =8, k= 4, n=8;
+    // int m = 30, k=30, n=30;
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
@@ -630,19 +633,19 @@ int main(int argc, char** argv)
 
 
 
-    //Calling Kernel
-    //(2) 1thread1element
-    // startTime = myCPUTimer();
-    // basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
-    // endTime = myCPUTimer();
-    // printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
-    //
-    // // printArray(m,n,ptrMtxGPU_h);
-    // bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
-    // if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
-    // else{printf("Error basicSgemm_d_1thread1element"); return -1;}
-    // // free(ptrMtxGPU_h);
-    // // ptrMtxGPU_h = NULL;
+    // Calling Kernel
+    // (2) 1thread1element
+    startTime = myCPUTimer();
+    basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    endTime = myCPUTimer();
+    printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
+    
+    // printArray(m,n,ptrMtxGPU_h);
+    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
+    else{printf("Error basicSgemm_d_1thread1element"); return -1;}
+    // free(ptrMtxGPU_h);
+    // ptrMtxGPU_h = NULL;
 
 
 
@@ -653,8 +656,8 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("\nbasicSgemm_d_tiled on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
-    // check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    // bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("\nVERIFY: basicSgemm_d_Tile PASSED👍👍👍\n\n");}
     else{printf("Error basicSgemm_d_Tile"); return -1;}
 
