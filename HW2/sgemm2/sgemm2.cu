@@ -275,6 +275,7 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
     //This is for Volta and Maxell, which avaialbe shared memory per block is 48k. 
     //And calculate valid TILE_WIDTH is 26.
     int const TILE_WIDTH = 26;
+    // int const TILE_WIDTH = 78;
 
     __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
     __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
@@ -354,7 +355,7 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
 //which uses dynamically allocated space in shared memory.
 //Here we assume each thread calculates one element of the output matrix.
 //Output void.
-__global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz)
+__global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz, int threadPerBlock)
 {
 
     bool debug = false;
@@ -372,7 +373,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
     //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
     // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
     // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
-    int const TILE_WIDTH = floor(sqrt(Adz_sz / (float)4));
+    int const TILE_WIDTH = threadPerBlock;
     // printf("\nsqrt(Adz_sz/2/4)TILE_WIDTH : %d", TILE_WIDTH);
     if(debug){
         printf("\nTILE_WIDTH : %d", TILE_WIDTH);
@@ -411,10 +412,10 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
         //Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
 
-        // //Compute tiled matrixA and matrixB
-        // for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
-        //     sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
-        // }// end of inner loop
+        //Compute tiled matrixA and matrixB
+        for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
+            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
+        }// end of inner loop
         // Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
 
@@ -520,7 +521,7 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     double startTime, endTime;
 
 
-    printf("\n\n\n~~~basicSgemm_d_1tile~~~");
+    printf("\n\n\n~~~basicSgemm_d_tile~~~");
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
     float* A_d = NULL;
     float* B_d = NULL;
@@ -560,10 +561,14 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
 
 
     startTime = myCPUTimer();
+
+    //Dynamic
     //Pass the avaialbe shared memoery
     //size / 2 indicates the available shared memory space for each tile matrix.
-    // matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2);
-    matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
+    
+    //Static
+    // matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
 
 
     cudaDeviceSynchronize();
@@ -644,8 +649,8 @@ int main(int argc, char** argv)
     bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1element"); return -1;}
-    // free(ptrMtxGPU_h);
-    // ptrMtxGPU_h = NULL;
+    free(ptrMtxGPU_h);
+    ptrMtxGPU_h = NULL;
 
 
 
