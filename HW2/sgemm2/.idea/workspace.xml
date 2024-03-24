@@ -20,17 +20,7 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a960ca1f-6c96-4408-ae1e-a28792bdd57c" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/../../HW1/sgemm/sgemm.cu" beforeDir="false" afterPath="$PROJECT_DIR$/../../HW1/sgemm/sgemm.cu" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/.ninja_deps" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/.ninja_deps" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/.ninja_log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/.ninja_log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/sgemm2.dir/cmake_device_link.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/sgemm2.dir/cmake_device_link.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/sgemm2.dir/sgemm2.cu.o" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/CMakeFiles/sgemm2.dir/sgemm2.cu.o" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/Testing/Temporary/LastTest.log" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/Testing/Temporary/LastTest.log" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/cmake-build-debug/sgemm2" beforeDir="false" afterPath="$PROJECT_DIR$/cmake-build-debug/sgemm2" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/sgemm2.cu" beforeDir="false" afterPath="$PROJECT_DIR$/sgemm2.cu" afterDir="false" />
-    </list>
+    <list default="true" id="a960ca1f-6c96-4408-ae1e-a28792bdd57c" name="Changes" comment="" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -104,7 +94,7 @@
       <workItem from="1711233434192" duration="4000" />
       <workItem from="1711233756079" duration="1800000" />
       <workItem from="1711235660082" duration="3466000" />
-      <workItem from="1711244530238" duration="323000" />
+      <workItem from="1711244530238" duration="640000" />
     </task>
     <servers />
   </component>
