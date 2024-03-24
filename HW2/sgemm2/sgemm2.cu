@@ -92,6 +92,100 @@ bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned i
     return true;
 } // end of verify
 
+//Input: int maxTileWidthForTile, maximum potential tile witdh
+//Process:  Function to check if a number is prime
+//Output: bool
+bool isPrime(int maxTileWidthForTile) {
+    // Handle numbers less than 2
+    if (maxTileWidthForTile < 2) {
+        return false;
+    }
+
+    // Check divisibility for numbers greater than 2
+    //If a number a cannot be devisible sqrt(a), then a is prime by mathmatical proof.
+    for (int i = 2; i * i <= maxTileWidthForTile; i++) {
+        if (maxTileWidthForTile % i == 0) {
+            // Found a divisor, maxTileWidthForTile is not a prime
+            return false;
+        }
+    }
+
+    // No divisors found, maxTileWidthForTile is prime
+    return true;
+}
+
+//Input: int maxSharedMemroy, the integer value from CUDA quesry max available shared memeory
+//Process: it calcuates maximum Tile width for each matrix and decide
+//Output:  int maxTileWidthForTile, available maximum tiile width matrix multiplication
+/*Potentially,
+Tesla: 45
+Fermi, Kepler, Maxwell, Pascal : 78
+Volta: 110
+Turing: 112
+Ampere144
+*/
+int calcMaxTileWidth(int maxSharedMemroy) {
+    //Calculate max shared memeory for each tile matrix
+    float sMemForTile = maxSharedMemroy / (float)2;
+    float numOfCellFloat = sMemForTile / 4;
+    float maxTileWidthForTile = sqrt(numOfCellFloat);
+    if(isPrime(maxTileWidthForTile)) {
+        //Make maxTIleWidthForTile divisible for tiling calculation.
+        maxTileWidthForTile--;
+    }
+
+    return maxTileWidthForTile;
+}
+
+
+//Input: int maxTileWidthForTile,  maximum Tile width for each matrix
+//Process: it calcuates temporary maximum available threads per block based on maximum Tile width for each matrix and decide
+//Output:  int threadPerBlock, available thread per block for tile matrix multiplication
+/*
+Potentially
+Tesla: 15
+Fermi, Kepler, Maxwell, Pascal : 26
+Volta: 22
+Turing: 28
+Ampere24
+ */
+int calcThreadPerBlock(int maxTileWidthForTile) {
+    int threadPerBlock = 0;
+    for(int wkr = 2; wkr <= maxTileWidthForTile; wkr++) {
+        //Check current maxTileWidh is divisible by walker, which increment by 1
+        //Smaller divisor can assign more threads per block
+        if(maxTileWidthForTile  % wkr == 0) {
+            int tempThreadPerBlock = maxTileWidthForTile  / wkr;
+            //Recall max thread per blck is blockDim(32, 32) total 1024;
+            //We need to find integer for thread per block which meets
+            //1. Divisible max tile width for tile in shared memeory
+            //2. Less than 33, maximam 32.
+            if(tempThreadPerBlock < 33) {
+                threadPerBlock = tempThreadPerBlock;
+                return threadPerBlock;
+            }
+        }
+    } // end of for loop
+
+    // Place holder
+    return  threadPerBlock = 1;
+}
+
+//Input: int maxSharedMemoery, the integer value from CUDA quesry max available shared memeory
+//Process: it calcuates maximum Tile width for each matrix and decides maximum available threads per block
+//Output:  int threadPerBlock, avaialble thread per block for tile matrix multiplication
+int getThreadPerBlock(int maxSharedMemory) {
+
+    //Calculate max Tile width in thie hardware
+    int maxTileWidthForTile = calcMaxTileWidth(maxSharedMemory);
+
+    //Calculate potential thread per block
+    int threadPerBlock = calcThreadPerBlock(maxTileWidthForTile);
+
+    return threadPerBlock;
+} // end of getThreadPerBlock
+
+
 
 //~~~~CUP function~~~~~
 //Input:
