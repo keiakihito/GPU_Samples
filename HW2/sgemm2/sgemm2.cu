@@ -230,23 +230,14 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
         // Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
 
-        // if(debug){
-        //     printf("\nPartiel sum for Tile %d: %f", tle_wkr, sum);
-        //     printf("\n\n");
-        // }
-
-        printf("\nSum: %f", sum);
-        if((rowGlbIdx < m) && (clmGlbIdx < n)){
-            C_d[rowGlbIdx * n + clmGlbIdx] = sum;
-        }
-
-        // //without boundry
-        // C_d[rowGlbIdx * n + clmGlbIdx] = sum;
-
-
 
     } // end of outer loop
 
+
+    // printf("\nSum: %f", sum);
+    if((rowGlbIdx < m) && (clmGlbIdx < n)){
+        C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+    }
 
     //No need to be free for allocating space
     //Shared memory is automatically managed by the CUDA runtime system
@@ -335,9 +326,9 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
         //     printf("\n\n");
         // }
 
-        // if((rowGlbIdx < m) && (clmGlbIdx < n)){
-        //     C_d[rowGlbIdx * n + clmGlbIdx] = sum;
-        // }
+        if((rowGlbIdx < m) && (clmGlbIdx < n)){
+            C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+        }
 
     } // end of outer loop
 
@@ -373,7 +364,6 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 {
     printf("\n~~~basicSgemm_d_1thread1element~~~");
     double startTime, endTime;
-    const int THREADS_PER_BLOCK = 1024;
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
     float* A_d = NULL;
     float* B_d = NULL;
