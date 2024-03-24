@@ -372,10 +372,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
     //Each matrix can use 24KB shared memoery space.
     //Tile width will be 24kb / 4byte for float = 6177 cells in 1 matrix
     //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
-    // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
-    // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
     int const TILE_WIDTH = threadPerBlock;
-    // printf("\nsqrt(Adz_sz/2/4)TILE_WIDTH : %d", TILE_WIDTH);
     if(debug){
         printf("\nTILE_WIDTH : %d", TILE_WIDTH);
     }
@@ -427,13 +424,6 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
     } // end of outer loop
 
-
-    // for (int rWkr = 0; rWkr < m; rWkr++) {
-    //     for (int cWkr = 0; cWkr < n; cWkr++) {
-    //         printf("%f ", C_d[rWkr * m + cWkr]);
-    //     } // end of inner loop
-    //     printf("\n");
-    // }// end of outer loop
 
     //No need to be free for allocating space
     //Shared memory is automatically managed by the CUDA runtime system
@@ -564,10 +554,10 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     //Dynamic
     //Pass the avaialbe shared memoery
     //size / 2 indicates the available shared memory space for each tile matrix.
-    // matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
+    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
     
     //Static
-    matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+    // matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
 
 
     cudaDeviceSynchronize();
