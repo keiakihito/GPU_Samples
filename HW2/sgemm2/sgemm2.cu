@@ -155,6 +155,108 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
 }// end of matrixMulKernel_1thread1element
 
 
+//Static
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process : A CUDA kernel where a “tiled” version of matrix multiplication is presented,
+//which uses dynamically allocated space in shared memory.
+//Here we assume each thread calculates one element of the output matrix.
+//Output void.
+__global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+{
+
+    bool debug = false;
+
+
+    //Decide Tile Width based on available shared memeory space
+    //Ex. suppose total 48KB shared memeory perblock for matrixA and matrixB
+    //Each matrix can use 24KB shared memoery space.
+    //Tile width will be 24kb / 4byte for float = 6177 cells in 1 matrix
+    //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
+    // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
+    // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
+    int const TILE_WIDTH = 4;
+
+    __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
+
+    // Calculate row global index  and column global index
+    unsigned int rowGlbIdx = blockIdx.y*blockDim.y+ threadIdx.y;
+    unsigned int clmGlbIdx = blockIdx.x*blockDim.x+ threadIdx.x;
+
+    float sum = 0.0f;
+
+    int numOfTile = ceil(k / (float)TILE_WIDTH);
+    if(debug){
+        printf("\nNumber of Tile : %d", numOfTile);
+    }
+
+    //Outer loop iterates 0 through last tile
+    //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
+    for(int tle_wkr = 0; tle_wkr < numOfTile; tle_wkr++){
+
+
+        //Load tile to shared memory
+        //if the thread is inside matix c's row and matrix c's column
+        //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
+        // if not, filling up value as 0 inside tile
+         if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
+             A_shrd[threadIdx.y][threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
+         }else{
+           A_shrd[threadIdx.y][threadIdx.x] = 0.0f;
+         }
+        if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
+            B_shrd[threadIdx.y][threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
+        }else{
+            B_shrd[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        // //Without boundry
+        // A_shrd[threadIdx.y][threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
+        // B_shrd[threadIdx.y][threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
+
+        //Wait until kernel loads all the data from global memory to shared memory
+        __syncthreads();
+
+
+        //Compute tiled matrixA and matrixB
+        for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
+            // sum += A_shrd[threadIdx.y][in_wkr] * B_shrd[in_wkr][threadIdx.x];
+            sum += A_shrd[threadIdx.y][in_wkr] * B_shrd[in_wkr][threadIdx.x];
+            // printf("\n%f", A_shrd[threadIdx.y][in_wkr]*B_shrd[in_wkr][threadIdx.x]);
+        }// end of inner loop
+        // Wait until kernel loads all the data from global memory to shared memory
+        __syncthreads();
+
+        // if(debug){
+        //     printf("\nPartiel sum for Tile %d: %f", tle_wkr, sum);
+        //     printf("\n\n");
+        // }
+
+        printf("\nSum: %f", sum);
+        if((rowGlbIdx < m) && (clmGlbIdx < n)){
+            C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+        }
+
+        // //without boundry
+        // C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+
+
+
+    } // end of outer loop
+
+
+    //No need to be free for allocating space
+    //Shared memory is automatically managed by the CUDA runtime system
+    //It is scoped to the lifetime of a block.
+
+} // end of matrixMulKernel_tiled
+
+
+
+
 // Dynamic
 //Input:
 //int m, number of row matrixA
@@ -167,13 +269,13 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
 __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz)
 {
 
-    bool debug = true;
+    bool debug = false;
 
     extern __shared__ char As_Bs[]; // It is shared memeory sapce for both matrix A tile and marix B tile
     //First index of address for the TileMatrix A in the dynamic shared memory
     float * A_shrd = (float*) As_Bs;
     //First index of address for the TileMatrix B in the dynamic shared memory
-    float * B_shrd = (float*) As_Bs + Adz_sz;
+    float * B_shrd = (float*) (As_Bs + Adz_sz / sizeof(float));
 
     //Decide Tile Width based on available shared memeory space
     //Ex. suppose total 48KB shared memeory perblock for matrixA and matrixB
@@ -184,9 +286,9 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
     // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
     int const TILE_WIDTH = floor(sqrt(Adz_sz / (float)4));
     // printf("\nsqrt(Adz_sz/2/4)TILE_WIDTH : %d", TILE_WIDTH);
-    // if(debug){
-    //     printf("\nTILE_WIDTH : %d", TILE_WIDTH);
-    // }
+    if(debug){
+        printf("\nTILE_WIDTH : %d", TILE_WIDTH);
+    }
 
 
     // Calculate row global index  and column global index
@@ -194,10 +296,10 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
     unsigned int clmGlbIdx = blockIdx.x*blockDim.x+ threadIdx.x;
 
     float sum = 0.0f;
-    int numOfTile = (k / (float)TILE_WIDTH);
-    // if(debug){
-    //     printf("\nNumber of Tile : %d", numOfTile);
-    // }
+    int numOfTile = ceil(k / (float)TILE_WIDTH);
+    if(debug){
+        printf("\nNumber of Tile : %d", numOfTile);
+    }
 
     //Outer loop iterates 0 through last tile
     //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
@@ -211,40 +313,32 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
          }else{
            A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
          }
-        // if(debug){
-        //     printf("\n\n~~~~Tile %d ~~~~~\n", tle_wkr);
-        //     printf("\nTIle Matrix A\n");
-        //     printArray(TILE_WIDTH, TILE_WIDTH, A_shrd);
-        // }
 
         if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
-            B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) *n + clmGlbIdx];
+            B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
         }else{
             B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
         }
-        // if(debug){
-        //     printf("\nTIle Matrix B\n");
-        //     printArray(TILE_WIDTH, TILE_WIDTH, B_shrd);
-        // }
 
         //Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
 
-        //Compute tiled matrixA and matrixB
-        for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
-            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
-        }// end of inner loop
+        // //Compute tiled matrixA and matrixB
+        // for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
+        //     sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
+        // }// end of inner loop
         // Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
 
-        if(debug){
-            printf("\nPartiel sum for Tile %d: %f", tle_wkr, sum);
-            printf("\n\n");
-        }
+        // if(debug){
+        //     printf("\nPartiel sum for Tile %d: %f", tle_wkr, sum);
+        //     printf("\n\n");
+        // }
 
-        if((rowGlbIdx < m) && (clmGlbIdx < n)){
-            C_d[rowGlbIdx * n + clmGlbIdx] = sum;
-        }
+        // if((rowGlbIdx < m) && (clmGlbIdx < n)){
+        //     C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+        // }
+
     } // end of outer loop
 
 
@@ -333,11 +427,10 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //Process  A host function for handling device memory allocation and copy, and calling the
 //specific CUDA kernel, matrixMulKernel_tiled
 //Output void
-void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
+void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, float* C_h)
 {
     bool debug = false;
     double startTime, endTime;
-    const int THREADS_PER_BLOCK = 1024;
 
 
     printf("\n\n\n~~~basicSgemm_d_1tile~~~");
@@ -375,12 +468,17 @@ void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h,
     }
 
     dim3 blockDim(32, 32);
+    // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
     dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+
 
     startTime = myCPUTimer();
     //Pass the avaialbe shared memoery
     //size / 2 indicates the available shared memory space for each tile matrix.
-    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2);
+    // matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2);
+    matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+
+
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
     printf("matrixMulKernel_tiled<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim.y,blockDim.x, blockDim.y, endTime - startTime);
@@ -389,6 +487,7 @@ void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h,
     //(4) Copy the result data from the device memory of array C_d to the host memory of array C_h.
     startTime = myCPUTimer();
     CHECK(cudaMemcpy(C_h, C_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
+    // printArray(m,n,C_h);
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
     printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
@@ -419,8 +518,9 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    // int m =77, k= 77, n=77;
-    int m =1234, k= 1567, n=1890;
+    int m =8, k= 8, n=8;
+    // int m = 78, k=78, n=78;
+    // int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
@@ -448,31 +548,31 @@ int main(int argc, char** argv)
 
     //Calling Kernel
     //(2) 1thread1element
-    startTime = myCPUTimer();
-    basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
-    endTime = myCPUTimer();
-    printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
-
-    // printArray(m,n,ptrMtxGPU_h);
-    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
-    if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
-    else{printf("Error basicSgemm_d_1thread1element"); return -1;}
-    free(ptrMtxGPU_h);
-    ptrMtxGPU_h = NULL;
+    // startTime = myCPUTimer();
+    // basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    // endTime = myCPUTimer();
+    // printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
+    //
+    // // printArray(m,n,ptrMtxGPU_h);
+    // bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    // if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
+    // else{printf("Error basicSgemm_d_1thread1element"); return -1;}
+    // // free(ptrMtxGPU_h);
+    // // ptrMtxGPU_h = NULL;
 
 
 
     //(3) Tiled GPU matrix multiplication
     ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
     startTime = myCPUTimer();
-    // basicSgemm_d_tiled(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    basicSgemm_d_tiled(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
     endTime = myCPUTimer();
     printf("\nbasicSgemm_d_tiled on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    // bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
-    if(check == true){printf("VERIFY: basicSgemm_d_Tile PASSED👍👍👍\n\n");}
-    else{printf("Error basicSgemm_d_1thread1row"); return -1;}
+    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    // check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    if(check == true){printf("\nVERIFY: basicSgemm_d_Tile PASSED👍👍👍\n\n");}
+    else{printf("Error basicSgemm_d_Tile"); return -1;}
 
 
 
