@@ -177,7 +177,7 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
     //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
     // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
     // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
-    int const TILE_WIDTH = 4;
+    int const TILE_WIDTH = 2;
 
     __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
     __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
@@ -457,7 +457,7 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
 
     }
 
-    dim3 blockDim(32, 32);
+    dim3 blockDim(2, 2);
     // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
     dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
@@ -508,7 +508,7 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    int m =8, k= 8, n=8;
+    int m =8, k= 4, n=8;
     // int m = 78, k=78, n=78;
     // int m =1234, k= 1567, n=1890;
 
