@@ -219,7 +219,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 {
     printf("\n~~~basicSgemm_d_1thread1element~~~");
     double startTime, endTime;
-    const int THREADS_PER_BLOCK = 1024;
+
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
     float* A_d = NULL;
     float* B_d = NULL;
@@ -241,7 +241,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32);
-    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -276,7 +276,6 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
     double startTime, endTime;
-    const int THREADS_PER_BLOCK = 1024;
 
     printf("\n\n\n~~~basicSgemm_d_1thread1row~~~");
     //(1) Allocate device memory for arrays A_d, B_d, and C_d.
@@ -301,7 +300,7 @@ void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32);
     // dim3 gridDim(ceil((float)n/ blockDim.x), ceil((float)m/blockDim.y),1);
-    dim3 gridDim(ceil((float)n/ THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1row<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -336,7 +335,6 @@ void basicSgemm_d_1thread1row(int m, int k, int n, const float* A_h, const float
 void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
     double startTime, endTime;
-    const int THREADS_PER_BLOCK = 1024;
 
 
     printf("\n\n\n~~~basicSgemm_d_1thread1column~~~");
@@ -361,7 +359,7 @@ void basicSgemm_d_1thread1column(int m, int k, int n, const float* A_h, const fl
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32);
-    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1column<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -400,13 +398,13 @@ int main(int argc, char** argv)
 
     double startTime, endTime;
 
-    // Convert arguments to integers
-    int m = atoi(argv[1]);
-    int k = atoi(argv[2]);
-    int n = atoi(argv[3]);
+    // // Convert arguments to integers
+    // int m = atoi(argv[1]);
+    // int k = atoi(argv[2]);
+    // int n = atoi(argv[3]);
 
-    // // // For direct input
-    // int m =1234, k= 1567, n=1890;
+    // // For direct input
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
@@ -439,7 +437,7 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1element"); return -1;}
     free(ptrMtxGPU_h);
@@ -453,7 +451,7 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("basicSgemm_d_1thread1row on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1row PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1row"); return -1;}
     free(ptrMtxGPU_h);
@@ -467,7 +465,7 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("basicSgemm_d_1thread1column on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1column PASSED👍👍👍\n\n");}
     else{printf("Error basicSgemm_d_1thread1column"); return -1;}
 

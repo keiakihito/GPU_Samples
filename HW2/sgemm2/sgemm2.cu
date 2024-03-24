@@ -205,12 +205,12 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
         //Load tile to shared memory
         //if the thread is inside matix c's row and matrix c's column
         //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
-        //if not, filling up value as 0 inside tile
-        if((rowGlbIdx < m) && (tle_wkr*TILE_WIDTH+threadIdx.x) < k){
-            A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
-        }else{
-          A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
-        }
+        // if not, filling up value as 0 inside tile
+         if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
+             A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
+         }else{
+           A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
+         }
         // if(debug){
         //     printf("\n\n~~~~Tile %d ~~~~~\n", tle_wkr);
         //     printf("\nTIle Matrix A\n");
@@ -301,7 +301,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 
     //(3) Call kernel to launch a grid of threads to perform the computation on GPU.
     dim3 blockDim(32, 32);
-    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
     startTime = myCPUTimer();
     matrixMulKernel_1thread1element<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
@@ -335,7 +335,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //Output void
 void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h, float* C_h)
 {
-    bool debug = true;
+    bool debug = false;
     double startTime, endTime;
     const int THREADS_PER_BLOCK = 1024;
 
@@ -375,7 +375,7 @@ void basicSgemm_d_tiled(int m, int k, int n, const float* A_h, const float *B_h,
     }
 
     dim3 blockDim(32, 32);
-    dim3 gridDim(ceil((float)n/THREADS_PER_BLOCK), ceil((float)m/THREADS_PER_BLOCK));
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
 
     startTime = myCPUTimer();
     //Pass the avaialbe shared memoery
@@ -419,8 +419,8 @@ int main(int argc, char** argv)
     // int n = atoi(argv[3]);
 
     // // For direct input
-    int m =77, k= 77, n=77;
-    // int m =78, k= 78, n=78;
+    // int m =77, k= 77, n=77;
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
@@ -453,22 +453,24 @@ int main(int argc, char** argv)
     endTime = myCPUTimer();
     printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
-    bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    // printArray(m,n,ptrMtxGPU_h);
+    bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1element"); return -1;}
     free(ptrMtxGPU_h);
+    ptrMtxGPU_h = NULL;
 
 
 
     //(3) Tiled GPU matrix multiplication
     ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
     startTime = myCPUTimer();
-    basicSgemm_d_tiled(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    // basicSgemm_d_tiled(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
     endTime = myCPUTimer();
-    printf("basicSgemm_d_tiled on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
+    printf("\nbasicSgemm_d_tiled on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
     // bool check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
-    check = verify(ptrMtxCPU_h, ptrMtxCPU_h, m, n);
+    check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_Tile PASSED👍👍👍\n\n");}
     else{printf("Error basicSgemm_d_1thread1row"); return -1;}
 
