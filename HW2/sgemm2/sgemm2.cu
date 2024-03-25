@@ -537,6 +537,7 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
     size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
+    //Calculate how many threads can be in a block and assign squre thread perblock as blockDim.x and blockDim.y later. 
     int sqrThreadPerBlock = getThreadPerBlock(size);
     if(debug){
         printf("\n~~~Device info~~~~");
