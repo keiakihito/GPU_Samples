@@ -537,27 +537,40 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
     size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
-    int threadPerBlock = getThreadPerBlock(size);
+    int sqrThreadPerBlock = getThreadPerBlock(size);
     if(debug){
         printf("\n~~~Device info~~~~");
         printf("\nDevices %d: %s", device, deviceProp.name);
         printf("\nMaximum amount of shared memory available per block: %.1fKB", (float)deviceProp.sharedMemPerBlock/1024);
         printf("\nMaximum memeory available for tiled matrix: %.1f", size/2);
-        printf("\nThread per block and Tile Width in Shared memoery: %d\n\n", threadPerBlock);
+        printf("\nThread per block and Tile Width in Shared memoery: %d\n\n", sqrThreadPerBlock);
     }
 
-    dim3 blockDim(threadPerBlock, threadPerBlock);
+    dim3 blockDim(sqrThreadPerBlock, sqrThreadPerBlock);
     // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
-    dim3 gridDim(ceil((float)n/threadPerBlock), ceil((float)m/threadPerBlock));
+    dim3 gridDim(ceil((float)n/sqrThreadPerBlock), ceil((float)m/sqrThreadPerBlock));
 
+    //Theorically it is faster because all the threads in block copy to sahred memoery.
+    //32 by 32 has a larger area than 26 by 26.
+    // //However, 32 by 32 is slower....
+    // dim3 blockDim(32, 32);
+    // // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+    // dim3 gridDim(ceil((float)n/32), ceil((float)m/32));
+    // //
+
+    // int TILE_WIDTH = 32;
 
     startTime = myCPUTimer();
 
     //Dynamic
     //Pass the avaialbe shared memoery
     //size / 2 indicates the available shared memory space for each tile matrix.
-    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
-    
+    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, sqrThreadPerBlock);
+
+    //Sared memery 32 by 32 case
+    // matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, 32);
+
+
     //Static
     // matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
 
@@ -595,14 +608,14 @@ int main(int argc, char** argv)
     double startTime, endTime;
 
     // Convert arguments to integers
-    int m = atoi(argv[1]);
-    int k = atoi(argv[2]);
-    int n = atoi(argv[3]);
+    // int m = atoi(argv[1]);
+    // int k = atoi(argv[2]);
+    // int n = atoi(argv[3]);
 
     // // For direct input
     // int m =8, k= 4, n=8;
     // int m = 30, k=30, n=30;
-    // int m =1234, k= 1567, n=1890;
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
