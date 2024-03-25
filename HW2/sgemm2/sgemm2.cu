@@ -395,16 +395,18 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
         //if the thread is inside matix c's row and matrix c's column
         //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
         // if not, filling up value as 0 inside tile
+        //Store value to tile matrix A with row major
          if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
              A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
          }else{
            A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
          }
 
+         //Store value to tile matrix B column major
         if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
-            B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
+            B_shrd[threadIdx.y + TILE_WIDTH*threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
         }else{
-            B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
+            B_shrd[threadIdx.y + TILE_WIDTH*threadIdx.x] = 0.0f;
         }
 
         //Wait until kernel loads all the data from global memory to shared memory
@@ -412,7 +414,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
         //Compute tiled matrixA and matrixB
         for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
-            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
+            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[TILE_WIDTH * threadIdx.x + in_wkr ];
         }// end of inner loop
         // Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
