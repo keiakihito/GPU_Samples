@@ -506,7 +506,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //Output void
 void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, float* C_h)
 {
-    bool debug = false;
+    bool debug = true;
     double startTime, endTime;
 
 
@@ -538,12 +538,16 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     cudaGetDeviceProperties(&deviceProp, device);
     size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
     // int threadPerBlock = getThreadPerBlock(size);
+    int fxdBlckSize = 24;
+    int maxTileSize = calcMaxTileWidth(size);
     if(debug){
         printf("\n~~~Device info~~~~");
         printf("\nDevices %d: %s", device, deviceProp.name);
         printf("\nMaximum amount of shared memory available per block: %.1fKB", (float)deviceProp.sharedMemPerBlock/1024);
-        printf("\nMaximum memeory available for tiled matrix: %.1f", size/2);
-        // printf("\nThread per block and Tile Width in Shared memoery: %d\n\n", threadPerBlock);
+        // printf("\nMaximum memeory available for tiled matrix: %.1f KB", size/2);
+        printf("\nPotential Maximum Tiles Width in Shared memoery: %d", maxTileSize);
+        printf("\nAssignening Thread per block and Tile Width in Shared memoery: %d\n\n", fxdBlckSize);
+
     }
 
     // dim3 blockDim(threadPerBlock, threadPerBlock);
@@ -553,7 +557,7 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     //Theorically it is faster because all the threads in block copy to sahred memoery.
     //32 by 32 has a larger area than 26 by 26.
     // //However, 32 by 32 is slower....
-    int fxdBlckSize = 24;
+
     dim3 blockDim(fxdBlckSize, fxdBlckSize);
     // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
     dim3 gridDim(ceil((float)n/fxdBlckSize), ceil((float)m/fxdBlckSize));
@@ -607,14 +611,14 @@ int main(int argc, char** argv)
     double startTime, endTime;
 
     // Convert arguments to integers
-    int m = atoi(argv[1]);
-    int k = atoi(argv[2]);
-    int n = atoi(argv[3]);
+    // int m = atoi(argv[1]);
+    // int k = atoi(argv[2]);
+    // int n = atoi(argv[3]);
 
     // // For direct input
     // int m =8, k= 4, n=8;
     // int m = 30, k=30, n=30;
-    // int m =1234, k= 1567, n=1890;
+    int m =1234, k= 1567, n=1890;
 
     float* ptrMtxA_h = (float*)malloc((m * k) * sizeof(float));
     fillUpArray(m, k, ptrMtxA_h);
