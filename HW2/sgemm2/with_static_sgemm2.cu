@@ -31,8 +31,7 @@ exit(-1); \
 }\
 }
 
-double myCPUTimer()
-{
+double myCPUTimer(){
     struct timeval tp;
     gettimeofday(&tp, NULL);
     return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
@@ -126,7 +125,6 @@ void basicSgemm_h(int m, int k, int n, const float *A_h, const float *B_h, float
         } // end of inner loop 1
 
     }// end of outer loop
-
 }// end of basicSgemm_h
 
 
@@ -157,6 +155,80 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
 }// end of matrixMulKernel_1thread1element
 
 
+//Static
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process : A CUDA kernel where a “tiled” version of matrix multiplication is presented,
+//which uses dynamically allocated space in shared memory.
+//Here we assume each thread calculates one element of the output matrix.
+//Output void.
+__global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
+{
+
+    //Alighn the Block size and Tile Width 
+    int const TILE_WIDTH = 32;
+
+
+    __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
+    __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
+
+    // Calculate row global index  and column global index
+    unsigned int rowGlbIdx = blockIdx.y*blockDim.y+ threadIdx.y;
+    unsigned int clmGlbIdx = blockIdx.x*blockDim.x+ threadIdx.x;
+
+    float sum = 0.0f;
+
+    int numOfTile = ceil(k / (float)TILE_WIDTH);
+
+    //Outer loop iterates 0 through last tile
+    //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
+    for(int tle_wkr = 0; tle_wkr < numOfTile; tle_wkr++){
+
+
+        //Load tile to shared memory
+        //if the thread is inside matix c's row and matrix c's column
+        //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
+        // if not, filling up value as 0 inside tile
+         if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
+             A_shrd[threadIdx.y][threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
+         }else{
+           A_shrd[threadIdx.y][threadIdx.x] = 0.0f;
+         }
+        if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
+            B_shrd[threadIdx.y][threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
+        }else{
+            B_shrd[threadIdx.y][threadIdx.x] = 0.0f;
+        }
+
+        //Wait until kernel loads all the data from global memory to shared memory
+        __syncthreads();
+
+
+        //Compute tiled matrixA and matrixB
+        for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
+            sum += A_shrd[threadIdx.y][in_wkr] * B_shrd[in_wkr][threadIdx.x];
+        }// end of inner loop
+        // Wait until kernel loads all the data from global memory to shared memory
+        __syncthreads();
+
+
+    } // end of outer loop
+
+    //Store partial sum to output matrix
+    if((rowGlbIdx < m) && (clmGlbIdx < n)){
+        C_d[rowGlbIdx * n + clmGlbIdx] = sum;
+    }
+
+    //No need to be free for allocating space
+    //Shared memory is automatically managed by the CUDA runtime system
+    //It is scoped to the lifetime of a block.
+
+} // end of matrixMulKernel_tiled
+
+
+
 
 //Dynamic
 //Input:
@@ -169,6 +241,7 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
 //Output void.
 __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz)
 {
+
     //It is shared memeory sapce for both matrix A tile and marix B tile.
     //Available shared meory spcace is passed as a argument when the kernel is called in the host function.
     //As_Bs is a pointer which points to the first address of shared memoery space for tile matricies. 
@@ -240,7 +313,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
 
 
-//~~~~~Host functions calling kernel~~~~~
+//~~~Host functions calling kernel~~~
 //A GPU-implimentation of two kernels above
 //For CUDA kernel 1,1thread1element
 
@@ -340,24 +413,42 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     cudaGetDevice(&device);
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
-
-    //Available  maximum shared memory for tiling
-    size_t size = (float)deviceProp.sharedMemPerBlock; 
+    size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
+    // int threadPerBlock = getThreadPerBlock(size);
     if(debug){
         printf("\n~~~Device info~~~~");
         printf("\nDevices %d: %s", device, deviceProp.name);
         printf("\nMaximum amount of shared memory available per block: %.1fKB\n", (float)deviceProp.sharedMemPerBlock/1024);
+        // printf("\nMaximum memeory available for tiled matrix: %.1f", size/2);
+        // printf("\nThread per block and Tile Width in Shared memoery: %d\n\n", threadPerBlock);
     }
 
+    // dim3 blockDim(threadPerBlock, threadPerBlock);
+    // // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+    // dim3 gridDim(ceil((float)n/threadPerBlock), ceil((float)m/threadPerBlock));
 
+    //Theorically it is faster because all the threads in block copy to sahred memoery.
+    //32 by 32 has a larger area than 26 by 26.
+    // //However, 32 by 32 is slower....
+    // int fxdBlckSize = 24;
     dim3 blockDim(32, 32);
     dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
-    
-
+    // dim3 gridDim(ceil((float)n/fxdBlckSize), ceil((float)m/fxdBlckSize));
+    //
 
     startTime = myCPUTimer();
+
+    //Dynamic
     //Pass the avaialbe shared memoery
+    //size / 2 indicates the available shared memory space for each tile matrix.
+    // matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
+    
+    //Sared memery 32 by 32 case
     matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2);
+
+
+    //Static
+    // matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
 
 
     cudaDeviceSynchronize();
@@ -379,7 +470,67 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     CHECK(cudaFree(C_d));
 
 
-} // end of basicSgemm_d_tiled
+}
+
+//For CUDA kernel tile
+//Input:
+//int m, number of row matrixA
+//int k, number of column matrixA, and number of row matrixB
+//int n, number of column matrixB
+//Process  A host function for handling device memory allocation and copy, and calling the
+//specific CUDA kernel, matrixMulKernel_tiled
+//Output void
+void basicSgemm_d_tiled_static(int m, int k, int n,  float* A_h, const float *B_h, float* C_h)
+{
+    double startTime, endTime;
+
+
+    printf("\n\n\n~~~basicSgemm_d_tile_static~~~");
+    //(1) Allocate device memory for arrays A_d, B_d, and C_d.
+    float* A_d = NULL;
+    float* B_d = NULL;
+    float* C_d = NULL;
+    startTime = myCPUTimer();
+    CHECK(cudaMalloc((void**)&A_d, sizeof(float)*(m * k)));
+    CHECK(cudaMalloc((void**)&B_d, sizeof(float)*(k * n)));
+    CHECK(cudaMalloc((void**)&C_d, sizeof(float)*(m * n)));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("\ncudaMalloc: %f s\n", endTime - startTime); fflush(stdout);
+
+    //(2) Copy arrays x_h and y_h to device memoery x_d and y_d, respectively.
+    startTime = myCPUTimer();
+    CHECK(cudaMemcpy(A_d, A_h, sizeof(float)*(m * k), cudaMemcpyHostToDevice));
+    CHECK(cudaMemcpy(B_d, B_h, sizeof(float)*(k * n), cudaMemcpyHostToDevice));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+
+    //(3) Call kernel to launch a grid of threads to perform the computation on GPU.   
+    dim3 blockDim(32, 32);
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+
+    startTime = myCPUTimer();
+    matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("matrixMulKernel_tiled_static<<<(%d,%d),(%d,%d)>>>: %f s\n", gridDim.x, gridDim.y, blockDim.x, blockDim.y, endTime - startTime);
+    fflush(stdout);
+
+    //(4) Copy the result data from the device memory of array C_d to the host memory of array C_h.
+    startTime = myCPUTimer();
+    CHECK(cudaMemcpy(C_h, C_d, sizeof(float)*(m*n), cudaMemcpyDeviceToHost));
+    cudaDeviceSynchronize();
+    endTime = myCPUTimer();
+    printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+
+    //(5) Free device memory
+    CHECK(cudaFree(A_d));
+    CHECK(cudaFree(B_d));
+    CHECK(cudaFree(C_d));
+
+} //end of basicSgemm_d_tiled_static
+
 
 
 
@@ -455,7 +606,25 @@ int main(int argc, char** argv)
     else{printf("Error basicSgemm_d_Tile"); return -1;}
 
 
-    // (4)Free host memory of arrays 
+    // free(ptrMtxGPU_h);
+    // ptrMtxGPU_h = NULL;
+
+    // //(4) Tiled GPU matrix static multiplication
+    // ptrMtxGPU_h = (float*)malloc((m * n) * sizeof(float));
+    // startTime = myCPUTimer();
+    // basicSgemm_d_tiled_static(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
+    // endTime = myCPUTimer();
+    // printf("\nbasicSgemm_d_tiled_static on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
+
+
+    // // bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    // check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
+    // if(check == true){printf("\nVERIFY: basicSgemm_d_Tile_static PASSED👍👍👍\n\n");}
+    // else{printf("Error basicSgemm_d_Tile"); return -1;}
+
+
+
+    // Free host memory of arrays 
     free(ptrMtxA_h);
     ptrMtxA_h = NULL;
     free(ptrMtxB_h);
