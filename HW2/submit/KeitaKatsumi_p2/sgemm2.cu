@@ -12,7 +12,7 @@
  * 3. basicSgemm_d_tiled, calling GPU kenel which computation result is created by tiled matrix in shared memory with dynamic allocation.
  * After calling three GPU function, it compares CPU matrix result to verify calculation result.
  *
- * Last modified March 24th , 2024
+ * Last modified March 30th , 2024
  */
 
 
@@ -31,7 +31,8 @@ exit(-1); \
 }\
 }
 
-double myCPUTimer(){
+double myCPUTimer()
+{
     struct timeval tp;
     gettimeofday(&tp, NULL);
     return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
@@ -92,101 +93,6 @@ bool verify(float* CPU_Answer, float* GPU_Answer, unsigned int nRows, unsigned i
     return true;
 } // end of verify
 
-//Input: int maxTileWidthForTile, maximum potential tile witdh
-//Process:  Function to check if a number is prime
-//Output: bool
-bool isPrime(int maxTileWidthForTile) {
-    // Handle numbers less than 2
-    if (maxTileWidthForTile < 2) {
-        return false;
-    }
-
-    // Check divisibility for numbers greater than 2
-    //If a number a cannot be devisible sqrt(a), then a is prime by mathmatical proof.
-    for (int i = 2; i * i <= maxTileWidthForTile; i++) {
-        if (maxTileWidthForTile % i == 0) {
-            // Found a divisor, maxTileWidthForTile is not a prime
-            return false;
-        }
-    }
-
-    // No divisors found, maxTileWidthForTile is prime
-    return true;
-}
-
-//Input: int maxSharedMemroy, the integer value from CUDA quesry max available shared memeory
-//Process: it calcuates maximum Tile width for each matrix and decide
-//Output:  int maxTileWidthForTile, available maximum tiile width matrix multiplication
-/*
-Potentially,
-Tesla: 45
-Fermi, Kepler, Maxwell, Pascal : 78
-Volta: 110
-Turing: 112
-Ampere144
-*/
-int calcMaxTileWidth(int maxSharedMemroy) {
-    //Calculate max shared memeory for each tile matrix
-    float sMemForTile = maxSharedMemroy / (float)2;
-    float numOfCellFloat = sMemForTile / 4;
-    float maxTileWidthForTile = sqrt(numOfCellFloat);
-    if(isPrime(maxTileWidthForTile)) {
-        //Make maxTIleWidthForTile divisible for tiling calculation.
-        maxTileWidthForTile--;
-    }
-
-    return maxTileWidthForTile;
-}
-
-
-//Input: int maxTileWidthForTile,  maximum Tile width for each matrix
-//Process: it calcuates temporary maximum available threads per block based on maximum Tile width for each matrix and decide
-//Output:  int threadPerBlock, available thread per block for tile matrix multiplication
-/*
-Potentially
-Tesla: 15
-Fermi, Kepler, Maxwell, Pascal : 26
-Volta: 22
-Turing: 28
-Ampere24
- */
-int calcThreadPerBlock(int maxTileWidthForTile) {
-    int threadPerBlock = 0;
-    for(int wkr = 2; wkr <= maxTileWidthForTile; wkr++) {
-        //Check current maxTileWidh is divisible by walker, which increment by 1
-        //Smaller divisor can assign more threads per block
-        if(maxTileWidthForTile  % wkr == 0) {
-            int tempThreadPerBlock = maxTileWidthForTile  / wkr;
-            //Recall max thread per blck is blockDim(32, 32) total 1024;
-            //We need to find integer for thread per block which meets
-            //1. Divisible max tile width for tile in shared memeory
-            //2. Less than 33, maximam 32.
-            if(tempThreadPerBlock < 33) {
-                threadPerBlock = tempThreadPerBlock;
-                return threadPerBlock;
-            }
-        }
-    } // end of for loop
-
-    // Place holder
-    return  threadPerBlock = 1;
-}
-
-//Input: int maxSharedMemoery, the integer value from CUDA quesry max available shared memeory
-//Process: it calcuates maximum Tile width for each matrix and decides maximum available threads per block
-//Output:  int threadPerBlock, avaialble thread per block for tile matrix multiplication
-int getThreadPerBlock(int maxSharedMemory) {
-
-    //Calculate max Tile width in thie hardware
-    int maxTileWidthForTile = calcMaxTileWidth(maxSharedMemory);
-
-    //Calculate potential thread per block
-    int threadPerBlock = calcThreadPerBlock(maxTileWidthForTile);
-
-    return threadPerBlock;
-} // end of getThreadPerBlock
-
-
 
 //~~~~CUP function~~~~~
 //Input:
@@ -220,6 +126,7 @@ void basicSgemm_h(int m, int k, int n, const float *A_h, const float *B_h, float
         } // end of inner loop 1
 
     }// end of outer loop
+
 }// end of basicSgemm_h
 
 
@@ -250,102 +157,6 @@ __global__ void  matrixMulKernel_1thread1element(int m, int k, int n, const floa
 }// end of matrixMulKernel_1thread1element
 
 
-//Static
-//Input:
-//int m, number of row matrixA
-//int k, number of column matrixA, and number of row matrixB
-//int n, number of column matrixB
-//Process : A CUDA kernel where a “tiled” version of matrix multiplication is presented,
-//which uses dynamically allocated space in shared memory.
-//Here we assume each thread calculates one element of the output matrix.
-//Output void.
-__global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A_d, const float *B_d, float* C_d)
-{
-
-    bool debug = false;
-
-
-    //Decide Tile Width based on available shared memeory space
-    //Ex. suppose total 48KB shared memeory perblock for matrixA and matrixB
-    //Each matrix can use 24KB shared memoery space.
-    //Tile width will be 24kb / 4byte for float = 6177 cells in 1 matrix
-    //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
-    // printf("\nAdz_sz for available space for matrix A: %d", Adz_sz);
-    // printf("\nAdz_sz/2/4 for how many blocks in the each matrix: %d", Adz_sz/4);
-    
-    //This is for Volta and Maxell, which avaialbe shared memory per block is 48k. 
-    //And calculate valid TILE_WIDTH is 26.
-    int const TILE_WIDTH = 26;
-    // int const TILE_WIDTH = 78;
-
-    __shared__ float A_shrd[TILE_WIDTH][TILE_WIDTH];
-    __shared__ float B_shrd[TILE_WIDTH][TILE_WIDTH];
-
-    // Calculate row global index  and column global index
-    unsigned int rowGlbIdx = blockIdx.y*blockDim.y+ threadIdx.y;
-    unsigned int clmGlbIdx = blockIdx.x*blockDim.x+ threadIdx.x;
-
-    float sum = 0.0f;
-
-    int numOfTile = ceil(k / (float)TILE_WIDTH);
-    if(debug){
-        printf("\nNumber of Tile : %d", numOfTile);
-    }
-
-    //Outer loop iterates 0 through last tile
-    //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
-    for(int tle_wkr = 0; tle_wkr < numOfTile; tle_wkr++){
-
-
-        //Load tile to shared memory
-        //if the thread is inside matix c's row and matrix c's column
-        //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
-        // if not, filling up value as 0 inside tile
-         if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
-             A_shrd[threadIdx.y][threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
-         }else{
-           A_shrd[threadIdx.y][threadIdx.x] = 0.0f;
-         }
-        if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
-            B_shrd[threadIdx.y][threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
-        }else{
-            B_shrd[threadIdx.y][threadIdx.x] = 0.0f;
-        }
-
-        // //Without boundry
-        // A_shrd[threadIdx.y][threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
-        // B_shrd[threadIdx.y][threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
-
-        //Wait until kernel loads all the data from global memory to shared memory
-        __syncthreads();
-
-
-        //Compute tiled matrixA and matrixB
-        for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
-            // sum += A_shrd[threadIdx.y][in_wkr] * B_shrd[in_wkr][threadIdx.x];
-            sum += A_shrd[threadIdx.y][in_wkr] * B_shrd[in_wkr][threadIdx.x];
-            // printf("\n%f", A_shrd[threadIdx.y][in_wkr]*B_shrd[in_wkr][threadIdx.x]);
-        }// end of inner loop
-        // Wait until kernel loads all the data from global memory to shared memory
-        __syncthreads();
-
-
-    } // end of outer loop
-
-
-    // printf("\nSum: %f", sum);
-    if((rowGlbIdx < m) && (clmGlbIdx < n)){
-        C_d[rowGlbIdx * n + clmGlbIdx] = sum;
-    }
-
-    //No need to be free for allocating space
-    //Shared memory is automatically managed by the CUDA runtime system
-    //It is scoped to the lifetime of a block.
-
-} // end of matrixMulKernel_tiled
-
-
-
 
 //Dynamic
 //Input:
@@ -356,26 +167,19 @@ __global__ void matrixMulKernel_tiled_static(int m, int k, int n, const float* A
 //which uses dynamically allocated space in shared memory.
 //Here we assume each thread calculates one element of the output matrix.
 //Output void.
-__global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz, int threadPerBlock)
+__global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, const float *B_d, float* C_d, unsigned Adz_sz, unsigned Bdz_sz)
 {
-
-    bool debug = false;
-
-    extern __shared__ char As_Bs[]; // It is shared memeory sapce for both matrix A tile and marix B tile
+    //It is shared memeory sapce for both matrix A tile and marix B tile.
+    //Available shared meory spcace is passed as a argument when the kernel is called in the host function.
+    //As_Bs is a pointer which points to the first address of shared memoery space for tile matricies. 
+    extern __shared__ char As_Bs[]; 
     //First index of address for the TileMatrix A in the dynamic shared memory
     float * A_shrd = (float*) As_Bs;
     //First index of address for the TileMatrix B in the dynamic shared memory
     float * B_shrd = (float*) (As_Bs + Adz_sz / sizeof(float));
 
-    //Decide Tile Width based on available shared memeory space
-    //Ex. suppose total 48KB shared memeory perblock for matrixA and matrixB
-    //Each matrix can use 24KB shared memoery space.
-    //Tile width will be 24kb / 4byte for float = 6177 cells in 1 matrix
-    //(floor)sqr(6177) = 78 and we have two 78 X 78 matres ;
-    int const TILE_WIDTH = threadPerBlock;
-    if(debug){
-        printf("\nTILE_WIDTH : %d", TILE_WIDTH);
-    }
+    //Align the block size and the Tile Width 
+    int const TILE_WIDTH = 32;
 
 
     // Calculate row global index  and column global index
@@ -384,9 +188,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
     float sum = 0.0f;
     int numOfTile = ceil(k / (float)TILE_WIDTH);
-    if(debug){
-        printf("\nNumber of Tile : %d", numOfTile);
-    }
+
 
     //Outer loop iterates 0 through last tile
     //Inner loop iterates 0 through TILE_WIDTH to compute partial sum
@@ -395,12 +197,15 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
         //if the thread is inside matix c's row and matrix c's column
         //then, load data from gloal memory and store it to Tile matrix A or Tile matrix B
         // if not, filling up value as 0 inside tile
+        //Store value to tile matrix A with row major
          if((rowGlbIdx < m) && ((tle_wkr*TILE_WIDTH+threadIdx.x) < k)){
-             A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
+            A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = A_d[rowGlbIdx*k + tle_wkr*TILE_WIDTH + threadIdx.x];
          }else{
-           A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
+            A_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = 0.0f;
          }
 
+        //Store value to tile matrix B column with memoery coalesceing technique
+        //Column vector is sotred in the consecutive memoery space
         if((tle_wkr *TILE_WIDTH +threadIdx.y < k) && clmGlbIdx < n){
             B_shrd[TILE_WIDTH*threadIdx.y + threadIdx.x] = B_d[(tle_wkr*TILE_WIDTH  + threadIdx.y) * n + clmGlbIdx];
         }else{
@@ -412,7 +217,7 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
         //Compute tiled matrixA and matrixB
         for(int in_wkr = 0; in_wkr < TILE_WIDTH; in_wkr++){
-            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[in_wkr * TILE_WIDTH + threadIdx.x];
+            sum += A_shrd[threadIdx.y * TILE_WIDTH + in_wkr] * B_shrd[TILE_WIDTH * in_wkr + threadIdx.x];
         }// end of inner loop
         // Wait until kernel loads all the data from global memory to shared memory
         __syncthreads();
@@ -435,9 +240,10 @@ __global__ void matrixMulKernel_tiled(int m, int k, int n, const float* A_d, con
 
 
 
-//Host functions calling kernel
-//AGPU-implimentation of three kernels above
-// For CUDA kernel 1,1thread1element
+//~~~~~Host functions calling kernel~~~~~
+//A GPU-implimentation of two kernels above
+//For CUDA kernel 1,1thread1element
+
 //Input:
 //int m, number of row matrixA
 //int k, number of column matrixA, and number of row matrixB
@@ -494,7 +300,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 
 } // end of basicSgemm_d_1thread1element
 
-// For CUDA kernel tile
+//For CUDA kernel tile
 //Input:
 //int m, number of row matrixA
 //int k, number of column matrixA, and number of row matrixB
@@ -504,7 +310,7 @@ void basicSgemm_d_1thread1element(int m, int k, int n, const float* A_h, const f
 //Output void
 void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, float* C_h)
 {
-    bool debug = false;
+    bool debug = true;
     double startTime, endTime;
 
 
@@ -534,35 +340,29 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     cudaGetDevice(&device);
     cudaDeviceProp deviceProp;
     cudaGetDeviceProperties(&deviceProp, device);
-    size_t size = (float)deviceProp.sharedMemPerBlock; //Available  maximum shared memory for tiling
-    int threadPerBlock = getThreadPerBlock(size);
+
+    //Available  maximum shared memory for tiling
+    size_t size = (float)deviceProp.sharedMemPerBlock; 
     if(debug){
         printf("\n~~~Device info~~~~");
         printf("\nDevices %d: %s", device, deviceProp.name);
-        printf("\nMaximum amount of shared memory available per block: %.1fKB", (float)deviceProp.sharedMemPerBlock/1024);
-        printf("\nMaximum memeory available for tiled matrix: %.1f", size/2);
-        printf("\nThread per block and Tile Width in Shared memoery: %d\n\n", threadPerBlock);
+        printf("\nMaximum amount of shared memory available per block: %.1fKB\n", (float)deviceProp.sharedMemPerBlock/1024);
     }
 
-    dim3 blockDim(threadPerBlock, threadPerBlock);
-    // dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
-    dim3 gridDim(ceil((float)n/threadPerBlock), ceil((float)m/threadPerBlock));
+
+    dim3 blockDim(32, 32);
+    dim3 gridDim(ceil((float)n/blockDim.x), ceil((float)m/blockDim.y));
+    
 
 
     startTime = myCPUTimer();
-
-    //Dynamic
     //Pass the avaialbe shared memoery
-    //size / 2 indicates the available shared memory space for each tile matrix.
-    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2, threadPerBlock);
-    
-    //Static
-    // matrixMulKernel_tiled_static<<<gridDim, blockDim>>>(m, k, n, A_d, B_d, C_d);
+    matrixMulKernel_tiled<<<gridDim, blockDim, size>>>(m, k, n, A_d, B_d, C_d, size/2, size/2);
 
 
     cudaDeviceSynchronize();
     endTime = myCPUTimer();
-    printf("matrixMulKernel_tiled<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim.y,blockDim.x, blockDim.y, endTime - startTime);
+    printf("matrixMulKernel_tiled<<<(%d,%d),(%d,%d), %d>>>: %f s\n", gridDim.x, gridDim.y, blockDim.x, blockDim.y, size, endTime - startTime);
     fflush(stdout);
 
     //(4) Copy the result data from the device memory of array C_d to the host memory of array C_h.
@@ -579,8 +379,7 @@ void basicSgemm_d_tiled(int m, int k, int n,  float* A_h, const float *B_h, floa
     CHECK(cudaFree(C_d));
 
 
-}
-
+} // end of basicSgemm_d_tiled
 
 
 
@@ -618,7 +417,7 @@ int main(int argc, char** argv)
 
 
 
-    //(1)  Calculate Matrix multiplication with CPU functinon
+    // (1)  Calculate Matrix multiplication with CPU functinon
     startTime = myCPUTimer();
     basicSgemm_h(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxCPU_h);
     endTime = myCPUTimer();
@@ -632,11 +431,12 @@ int main(int argc, char** argv)
     basicSgemm_d_1thread1element(m,k,n, ptrMtxA_h, ptrMtxB_h, ptrMtxGPU_h);
     endTime = myCPUTimer();
     printf("basicSgemm_d_1thread1element on GPU: %f s \n\n", endTime - startTime); fflush(stdout);
-    
-    // printArray(m,n,ptrMtxGPU_h);
+
+
     bool check = verify(ptrMtxCPU_h, ptrMtxGPU_h, m, n);
     if(check == true){printf("VERIFY: basicSgemm_d_1thread1element PASSED👍👍👍");}
     else{printf("Error basicSgemm_d_1thread1element"); return -1;}
+    
     free(ptrMtxGPU_h);
     ptrMtxGPU_h = NULL;
 
@@ -655,8 +455,7 @@ int main(int argc, char** argv)
     else{printf("Error basicSgemm_d_Tile"); return -1;}
 
 
-
-    // Free host memory of arrays 
+    // (4)Free host memory of arrays 
     free(ptrMtxA_h);
     ptrMtxA_h = NULL;
     free(ptrMtxB_h);
