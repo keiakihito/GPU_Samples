@@ -1,7 +1,14 @@
 #include <opencv2/opencv.hpp>
 #include <sys/time.h>
 
+//Convolution filter radius
 #define FILTER_RADIUS 2
+
+//Input tile dimenstion in shared memory 
+#define IN_TILE_DIM 32
+
+//Align block dimension with output tile dimension
+#define OUT_TILE_DIM ((IN_TILE_DIM) - 2*FILTER_RADIUS)
 
 //for simplicity, we use the constant average filter only in this assignment
 const float F_h[2*FILTER_RADIUS+1][2*FILTER_RADIUS+1] = {
@@ -10,9 +17,16 @@ const float F_h[2*FILTER_RADIUS+1][2*FILTER_RADIUS+1] = {
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25}
-}
+};
 
-__constant__ float F_d[2*FILTER_RADIUS][2*FILTER_RADIUS];
+
+__constant__ float F_d[2*FILTER_RADIUS+1][2*FILTER_RADIUS+1] = {
+	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
+	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
+	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
+	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
+	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25}
+};
 
 #define CHECK(call){ \
 	const cudaError_t cuda_ret = call; \
@@ -55,6 +69,33 @@ double myCPUTimer(){
 void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols)
 {
 
+	float sum = 0.0f;
+	int radius = FILTER_RADIUS;
+	int fHeight = FILTER_RADIUS*2+1;
+	int fWidth = FILTER_RADIUS*2+1;
+
+	// loop where orWkr iterates from 0 through nRows
+	for(int orWkr = 0; orWkr < nRows; orWkr++){
+		// loop where ocWkr iterates from 0 through nCols
+		for(int ocWkr = 0; ocWkr < nCols; ocWkr++){
+			// loop where frWkr iterates from 0 through fHeight{
+			for(int frWkr = 0; frWkr < fHeight; frWkr++){
+				//loop where fcWkr iterates from 0 through fWidth
+				for(int fcWkr = 0; fcWkr < fWidth; fcWkr++){
+					//Calculate target cell in the input matrix with corresponding filter cell
+					inRow = orWkr - radius + frWkr;
+					inCol = ocWkr - radius + fcWkr;
+					if(inRow >=0 && inRow < nRows && inCol >= 0 && inCol < width){
+						//How to access Pin_Mat_h specific cell?
+						sum += F_h[frWkr][fcWkr] * Pin_Mat_h[inRow * width + inCol];
+					}
+				}//end of fcWkr loop
+			}//end of frWkr loop
+			Pin_Mat_h[orWkr][ocWkr] = sum;
+		}// end of ocWkr loop
+	} // end of orWkr loop
+		
+			
 	//Gray scale code
 	// // a CPU-implementaion of color-to-gray convertion
 	// for(int i=0; i<nRows; i++){
@@ -71,25 +112,160 @@ void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsi
 
 
 //A CUDA kernel of image blur using the average box filter
-__global__ void blurImage_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int width, unsigned int height){
+__global__ void blurImage_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int height, unsigned int width)
+{
+	int glbRow = blockIdx.y * blockDim.y + threadIdx.y;
+	int glbCol = blockIdx.x * blockDim.x + threadIdx.x;
+	float sum = 0.0f;
+	int radius = FILTER_RADIUS;
 
+	//Calculate target cell in the input matrix with corresponding filter cell
+	for(int frWkr = 0; frWkr < 2*radius + 1){
+		for(int fcWkr = 0; fcWkr < 2*radius + 1){
+			int inRow = glbRow - radius + frWkr;
+		    int inCol = glbCol - radius + fcWkr;
+			if(inRow >= 0 && inRow < height && inCol >= 0 && inCol < width){
+				//How to access Pin specific cell?
+				sum += F_d[frWkr][fcWkr] * Pin[inRow * width + inCol];
+			}
+		}// end of inner loop
+	} // end of outer loop
+
+	//How to access Pout specific cells?
+	Pout[glbRow*width+glbCol] = sum;			
 }// end of blurImage_Kernel
 
 
 //A GPU-implementaion of image blur using the average box filter
 void blurImage_d(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols){
+		//a GPU-implementatoin of  blurImage
+		double startTime, endTime;
 
+		//(1) Allocate device memory.
+		unsigned char* Pin_d = NULL;
+		unsigned char* Pout_d = NULL;
+		startTime = myCPUTimer();
+		CHECK(cudaMalloc((void**)&Pin_d, nRows*nCols*sizeof(unsigned char)));
+		CHECK(cudaMalloc((void**)&Pout_d, nRows*nCols*sizeof(unsigned char)));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMalloc: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(2) Copy data to device memory
+		startTime = myCPUTimer();
+		CHECK(cudaMemcpy(Pin_d, Pin_Mat_h.data, nRows * nCols * sizeof(unsigned char), cudaMemcpyHostToDevice));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(3) Call kernel to launch a grid of threads to perform the computation on GPU.
+		dim3 blockDim(28, 28, 1);
+		dim3 gridDim(ceil((float)nCols/ blockDim.x), ceil((float)nRows/blockDim.y),1);
+
+		startTime = myCPUTimer();
+		blurImage_Kernel<<<gridDim, blockDim>>>(Pout_d, Pin_d, nRows, nCols);
+		CHECK(cudaDeviceSynchronize());
+		endTime = myCPUTimer();
+		printf("blurImage_Kernel<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim., blockDim.x, blockDim.y, endTime - startTime);
+		fflush(stdout);
+
+		//(4)Copy the result data from the device to the host memory
+		startTime = myCPUTimer();
+		CHECK(cudaMemcpy(Pout_Mat_h.data, Pout_d, nRows * nCols * sizeof(unsigned char), cudaMemcpyDeviceToHost));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(5) Free device memory
+		CHECK(cudaFree(Pin_d));
+		CHECK(cudaFree(Pout_d));
 }// end of blurImage_d
 
 //An optimized CUDA kernel of image blur using the average box filter from constant memory
-__global__ void blurImage_tiled_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int width, unsigned int height){
+__global__ void blurImage_tiled_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int height, unsigned int width)
+{
+	int glbRow = blockIdx.y * blockDim.y + threadIdx.y;
+	int glbCol = blockIdx.x * blockDim.x + threadIdx.x;
+	float sum = 0.0f;
+	int radius = FILTER_RADIUS;
+
+	//loading input tile 
+	__shared__ Pin_shrd[IN_TILE_DIM][IN_TILE_DIM];
+	//Fill up 0 if the target cell is edges or the 2D matrix
+	if(glbRow >= 0 && glbRow < height && glbCol >= 0 && glbCol < width){
+		Pin_shrd[threadIdx.y][threadIdx.x] = Pin[glbRow*width + glbCol];
+	}else{
+		Pin_shrd[threadIdx.y][threadIdx.x] = 0.0;
+	}
+	__syncthreads();
+
+	//Calculate target cell in the input matrix with corresponding filter cell
+	int tileRow = threadIdx.y - FILTER_RADIUS;
+	int tileCol = threadIdx.x - FILTER_RADIUS;
+
+	//Turning off the threads at the edges of the block
+	if(glbRow >= 0 && glbRow < height && glbCol >= 0 && global < width){
+		if(tileRow >= 0 && tileRow < OUT_TILE_DIM && tileCol >= 0 && tileCol < OUT_TILE_DIM){
+			float sum = 0.0f;
+			for (int frWkr = 0; frWkr < 2*radius + 1){
+				for(int fcWkr = 0; fcWkr < 2*radius + 1){
+					//Calculate target cell in the input matrix with corresponding filter cell
+					sum += F[frWkr][fcWkr] * Pin_shrd[tileRow + frWkr][tileCol+fcWkr];
+				}// end of inner loop
+			} // end of outer loop
+
+			//How to access Pout specific cells?
+			Pout[glbRow*width+glbCol] = sum;
+
+		} // end of inner if
+	} // end of outer if
 
 }// end of blurImage_tiled_Kernel
 
 
 //A GPU-implementaion of image blur, where the kernel performs shared memoery tiled convolution using the average box filter from constant memory
 void blurImage_tiled_d(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols){
+		//a GPU-implementatoin of  blurImage with tile in the shared memory
+		double startTime, endTime;
 
+		//(1) Allocate device memory.
+		unsigned char* Pin_d = NULL;
+		unsigned char* Pout_d = NULL;
+		startTime = myCPUTimer();
+		CHECK(cudaMalloc((void**)&Pin_d, nRows*nCols*sizeof(unsigned char)));
+		CHECK(cudaMalloc((void**)&Pout_d, nRows*nCols*sizeof(unsigned char)));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMalloc: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(2) Copy data to device memory
+		startTime = myCPUTimer();
+		CHECK(cudaMemcpy(Pin_d, Pin_Mat_h.data, nRows * nCols * sizeof(unsigned char), cudaMemcpyHostToDevice));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(3) Call kernel to launch a grid of threads to perform the computation on GPU.
+		dim3 blockDim(28, 28, 1);
+		dim3 gridDim(ceil((float)nCols/ blockDim.x), ceil((float)nRows/blockDim.y),1);
+
+		startTime = myCPUTimer();
+		blurImage_Kernel<<<gridDim, blockDim>>>(Pout_d, Pin_d, nRows, nCols);
+		CHECK(cudaDeviceSynchronize());
+		endTime = myCPUTimer();
+		printf("blurImage_tiled_d<<<(%d,%d),(%d,%d) >>>: %f s\n", gridDim.x, gridDim., blockDim.x, blockDim.y, endTime - startTime);
+		fflush(stdout);
+
+		//(4)Copy the result data from the device to the host memory
+		startTime = myCPUTimer();
+		CHECK(cudaMemcpy(Pout_Mat_h.data, Pout_d, nRows * nCols * sizeof(unsigned char), cudaMemcpyDeviceToHost));
+		cudaDeviceSynchronize();
+		endTime = myCPUTimer();
+		printf("cudaMemcpy: %f s\n", endTime - startTime); fflush(stdout);
+
+		//(5) Free device memory
+		CHECK(cudaFree(Pin_d));
+		CHECK(cudaFree(Pout_d));
 }// end of blurImage_tiled_d
 
 
@@ -172,7 +348,7 @@ int main(int argc, char** argv){
 	double startTime, endTime;
 
 	//use OpenCV to load a grayscale image.
-	cv::Mat grayImg = cv::imread("santa-grayscale.jpg", cv::IMREAD_GRAYSCALE);
+	cv::Mat grayImg = cv::imread("grayImg.jpg", cv::IMREAD_GRAYSCALE);
 	if(colorImg.empty()) {return -1;}
 
 	//Obtain image's height, width, and number of channles
