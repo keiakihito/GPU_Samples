@@ -1,5 +1,24 @@
+/**
+ * file name: convolution.cu
+ * Author: Keita Katsumi
+ * CS 4990 Spring  2024
+ *   
+ *
+ * Description:
+ * Camparing convolution implementations' benchmark
+ * 1. opencv library blurred image function
+ * 2. blurImage_h: A host function for CPU-only convolution.
+ * 3. blurImage_d: A CUDA kernel performs a simple convolution without using tiling.
+ * 4. blurImage_tiled_d: A CUDA kernel that performs a “tiled” version of convolution using GPU shared memory 
+ * and loading the filter elements from GPU constant memory.
+ *
+ * Last modified April 15th , 2024
+ */
+
+ 
 #include <opencv2/opencv.hpp>
 #include <sys/time.h>
+
 
 //Convolution filter radius
 #define FILTER_RADIUS 2
@@ -19,7 +38,7 @@ const float F_h[2*FILTER_RADIUS+1][2*FILTER_RADIUS+1] = {
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25}
 };
 
-
+//Assigning the filter elements in GPU constant memory
 __constant__ float F_d[2*FILTER_RADIUS+1][2*FILTER_RADIUS+1] = {
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
 	{1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25, 1.0f / 25},
@@ -65,7 +84,13 @@ double myCPUTimer(){
 	return ((double)tp.tv_sec + (double)tp.tv_usec/1.0e6);
 }
 
-//A CPU-implementation of image blur using the average box filter
+//Input: 
+//Mat Pout_Mat_h, opencv object for output image data
+//Mat Pin_Mat_h, opencv object for input image data
+//unsigned int nRows, the number of elements in row
+//unsigned int nCols, the number of elements in column
+//Process: A CPU-implementation of image blur using the average box filter
+//output: void
 void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols)
 {
 
@@ -78,6 +103,7 @@ void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsi
 	for(int orWkr = 0; orWkr < nRows; orWkr++){
 		// loop where ocWkr iterates from 0 through nCols
 		for(int ocWkr = 0; ocWkr < nCols; ocWkr++){
+			sum = 0.0f;
 			// loop where frWkr iterates from 0 through fHeight{
 			for(int frWkr = 0; frWkr < fHeight; frWkr++){
 				//loop where fcWkr iterates from 0 through fWidth
@@ -87,12 +113,11 @@ void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsi
 					int inCol = ocWkr - radius + fcWkr;
 					if(inRow >=0 && inRow < nRows && inCol >= 0 && inCol < nCols){
 						//How to access Pin_Mat_h specific cell?
-						sum += F_h[frWkr][fcWkr] * Pin_Mat_h.at<float>(inRow, inCol);
+						sum += F_h[frWkr][fcWkr] * Pin_Mat_h.at<uchar>(inRow, inCol);
 					}
 				}//end of fcWkr loop
 			}//end of frWkr loop
-			Pout_Mat_h.at<float>(orWkr, ocWkr) = sum;
-			sum = 0.0f;
+			Pout_Mat_h.at<uchar>(orWkr, ocWkr) = static_cast<uchar>(sum);
 		}// end of ocWkr loop
 	} // end of orWkr loop
 		
@@ -100,7 +125,13 @@ void blurImage_h(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsi
 } // end of blurImage_h
 
 
-//A CUDA kernel of image blur using the average box filter
+//Input: 
+//Unsigned char * Pout, pointer for output image in GPU global memory
+//Unsigned char * Pin, pointer for input image copied form opencv object in GPU global memory
+//unsigned int height, the number of elements in column
+//unsigned int width, the number of elements in row
+//Process: A CUDA kernel of image blur using the average box filter
+//output: void
 __global__ void blurImage_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int height, unsigned int width)
 {
 	int glbRow = blockIdx.y * blockDim.y + threadIdx.y;
@@ -124,8 +155,13 @@ __global__ void blurImage_Kernel(unsigned char * Pout, unsigned char * Pin, unsi
 	Pout[glbRow*width+glbCol] = sum;			
 }// end of blurImage_Kernel
 
-
-//A GPU-implementaion of image blur using the average box filter
+//Input: 
+//Mat Pout_Mat_h, opencv object for output image data
+//Mat Pin_Mat_h, opencv object for input image data
+//unsigned int nRows, the number of elements in row
+//unsigned int nCols, the number of elements in column
+//Process: A GPU-implementaion of image blur using the average box filter
+//output: void
 void blurImage_d(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols){
 		//a GPU-implementatoin of  blurImage
 		double startTime, endTime;
@@ -170,7 +206,14 @@ void blurImage_d(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsi
 		CHECK(cudaFree(Pout_d));
 }// end of blurImage_d
 
-//An optimized CUDA kernel of image blur using the average box filter from constant memory
+
+//Input: 
+//Unsigned char * Pout, pointer for output image in GPU global memory
+//Unsigned char * Pin, pointer for input image copied form opencv object in GPU global memory
+//unsigned int height, the number of elements in column
+//unsigned int width, the number of elements in row
+//Process: An optimized CUDA kernel of image blur using the average box filter from constant memory
+//output: void
 __global__ void blurImage_tiled_Kernel(unsigned char * Pout, unsigned char * Pin, unsigned int height, unsigned int width)
 {
 	int glbRow = blockIdx.y * blockDim.y + threadIdx.y;
@@ -211,8 +254,13 @@ __global__ void blurImage_tiled_Kernel(unsigned char * Pout, unsigned char * Pin
 
 }// end of blurImage_tiled_Kernel
 
-
-//A GPU-implementaion of image blur, where the kernel performs shared memoery tiled convolution using the average box filter from constant memory
+//Input: 
+//Mat Pout_Mat_h, opencv object for output image data
+//Mat Pin_Mat_h, opencv object for input image data
+//unsigned int nRows, the number of elements in row
+//unsigned int nCols, the number of elements in column
+//Process: A GPU-implementaion of image blur, where the kernel performs shared memoery tiled convolution using the average box filter from constant memory
+//output: void
 void blurImage_tiled_d(cv::Mat Pout_Mat_h, cv::Mat Pin_Mat_h, unsigned int nRows, unsigned int nCols){
 		//a GPU-implementatoin of  blurImage with tile in the shared memory
 		double startTime, endTime;
@@ -264,8 +312,16 @@ int main(int argc, char** argv){
 
 	double startTime, endTime;
 
+	if(argc < 2){
+		printf("\n\n~~Error! Passing correct argument value and place in command line.~~\n\n");
+        return -1;
+	}
+
+	// The file name is taken from the command line
+    const char* fName = argv[1];
+
 	//use OpenCV to load a grayscale image.
-	cv::Mat grayImg = cv::imread("grayImg.jpg", cv::IMREAD_GRAYSCALE);
+	cv::Mat grayImg = cv::imread(fName, cv::IMREAD_GRAYSCALE);
 	if(grayImg.empty()) {return -1;}
 
 	//Obtain image's height, width, and number of channles
@@ -280,15 +336,15 @@ int main(int argc, char** argv){
 	printf("openCV's blurredImg_opencv: %f s \n\n", endTime - startTime); fflush(stdout);
 
 
-	// //for comparison purpose, implement a cpu versin
-	// //cv::Mat constructor to create and initialize an cv:Mat object;
-	// //Note that CV_8UC1 implies 8-bit unsigned, single channel
-	// printf("\n\n~~~blurredImg_cpu~~~\n");
-	// cv::Mat blurredImg_cpu(nRows, nCols, CV_8UC1, cv::Scalar(0));
-	// startTime = myCPUTimer();
-	// blurImage_h(blurredImg_cpu, grayImg, nRows, nCols);
-	// endTime = myCPUTimer();
-	// printf("blureImage on CPU: %f s \n\n", endTime - startTime); fflush(stdout);
+	//for comparison purpose, implement a cpu versin
+	//cv::Mat constructor to create and initialize an cv:Mat object;
+	//Note that CV_8UC1 implies 8-bit unsigned, single channel
+	printf("\n\n~~~blurredImg_cpu~~~\n");
+	cv::Mat blurredImg_cpu(nRows, nCols, CV_8UC1, cv::Scalar(0));
+	startTime = myCPUTimer();
+	blurImage_h(blurredImg_cpu, grayImg, nRows, nCols);
+	endTime = myCPUTimer();
+	printf("blureImage on CPU: %f s \n\n", endTime - startTime); fflush(stdout);
 
 
 
@@ -317,8 +373,8 @@ int main(int argc, char** argv){
 	bool check = cv:: imwrite("./blurredImg_opencv.jpg", blurredImg_opencv);
 	if(check == false){printf("Error blurredImg_opencv.jpg! \n \n"); return -1;}
 
-	// check = cv:: imwrite("./blurredImg_cpu.jpg", blurredImg_cpu);
-	// if(check == false){printf("Error saving blurredImg_cpu.jpg! \n \n"); return -1;}
+	check = cv:: imwrite("./blurredImg_cpu.jpg", blurredImg_cpu);
+	if(check == false){printf("Error saving blurredImg_cpu.jpg! \n \n"); return -1;}
 
 	check = cv:: imwrite("./blurredImg_gpu.jpg", blurredImg_gpu);
 	if(check == false){printf("Error saving blurredImg_gpu.jpg! \n \n"); return -1;}
@@ -328,8 +384,8 @@ int main(int argc, char** argv){
 
 	// //Check if the result blurred images are similar to that of OpenCV's
 	printf("\n\n + + + + 🧐🧐🧐 Let's verify 🧐🧐🧐 + + + + \n");
-	// printf("\n\n~~~blurredImg_cpu~~~\n");
-	// verify(blurredImg_opencv, blurredImg_cpu, nRows, nCols);
+	printf("\n\n~~~blurredImg_cpu~~~\n");
+	verify(blurredImg_opencv, blurredImg_cpu, nRows, nCols);
 	printf("\n~~~blurredImg_gpu~~~\n");
 	verify(blurredImg_opencv, blurredImg_gpu, nRows, nCols);
 	printf("\n~~~blurredImg_tiled_gpu~~~\n");
